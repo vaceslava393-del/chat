@@ -174,7 +174,6 @@ ALLOWED_APPS.update({
     "рисование": "mspaint.exe",
 
     "cmd": "cmd.exe",
-    "steam": "steam.exe",
 
 
 })
@@ -273,7 +272,6 @@ def open_application(application: str):
             "рисование": "mspaint.exe",
 
             "cmd": "cmd.exe",
-            "steam": "steam.exe",
 
 
         })
@@ -321,7 +319,6 @@ def open_application(application: str):
                 "explorer.exe",
                 "mspaint.exe",
                 "cmd.exe",
-                "steam.exe",
             ]
         ):
 
@@ -395,7 +392,7 @@ def get_applications():
         "рисование": "mspaint.exe",
 
         "cmd": "cmd.exe",
-        "steam": "steam.exe",
+
 
     })
 
@@ -797,26 +794,114 @@ def open_website(url: str):
                 f"Ошибка открытия сайта: {e}"
             )
         }
+
 # ============================================================
-# Steam
-# =============================================================
+# STEAM
+# ============================================================
+
 def open_steam():
+
+    possible_paths = [
+
+        # Обычный Steam
+        Path(
+            os.environ.get(
+                "PROGRAMFILES(X86)",
+                r"C:\Program Files (x86)"
+            )
+        ) / "Steam" / "steam.exe",
+
+        # 64-bit вариант
+        Path(
+            os.environ.get(
+                "PROGRAMFILES",
+                r"C:\Program Files"
+            )
+        ) / "Steam" / "steam.exe",
+
+        # Если Steam установлен в AppData
+        Path.home() / "AppData" / "Local" / "Steam" / "steam.exe",
+
+    ]
+
+    # --------------------------------------------------------
+    # Ищем Steam
+    # --------------------------------------------------------
+
+    steam_path = None
+
+    for path in possible_paths:
+
+        if path.is_file():
+
+            steam_path = path
+            break
+
+    # --------------------------------------------------------
+    # Если не нашли по стандартному пути,
+    # пробуем Windows PATH
+    # --------------------------------------------------------
+
+    if steam_path is None:
+
+        import shutil
+
+        found = shutil.which("steam.exe")
+
+        if found:
+
+            steam_path = Path(found)
+
+    # --------------------------------------------------------
+    # Steam не найден
+    # --------------------------------------------------------
+
+    if steam_path is None:
+
+        return {
+            "success": False,
+            "message": (
+                "Steam не найден. "
+                "Проверь, установлен ли Steam."
+            )
+        }
+
+    # --------------------------------------------------------
+    # Запускаем Steam
+    # --------------------------------------------------------
+
     try:
+
+        print(
+            "Запускаю Steam:"
+        )
+
+        print(
+            steam_path
+        )
+
         subprocess.Popen(
-            ["steam.exe"],
+            [str(steam_path)],
             shell=False
         )
 
         return {
             "success": True,
+            "application": "steam",
+            "path": str(steam_path),
             "message": "Steam запущен."
         }
 
     except Exception as e:
+
         return {
             "success": False,
-            "message": f"Не удалось запустить Steam: {e}"
+            "message": (
+                f"Не удалось запустить Steam: {e}"
+            )
         }
+
+
 
 
 # ============================================================
@@ -1032,9 +1117,10 @@ TOOLS = [
             "name": "get_pc_info",
 
             "description": (
-                "Получить информацию о компьютере "
-                "Windows: ОС, процессор, количество "
-                "CPU и свободное место на диске."
+                "Получить информацию о компьютере Windows: "
+                "операционная система, версия, процессор, "
+                "количество CPU, имя компьютера и место "
+                "на системном диске."
             ),
 
             "parameters": {
@@ -1053,9 +1139,11 @@ TOOLS = [
             "name": "open_application",
 
             "description": (
-                "Запустить разрешённое приложение Windows. "
-                "Доступны: notepad, calculator, explorer, "
-                "paint, cmd, chrome, edge, firefox."
+                "Запустить любое приложение, установленное "
+                "на компьютере Windows. Можно использовать "
+                "название приложения: Chrome, Edge, Firefox, "
+                "Telegram, Discord, Steam, VS Code, Photoshop, "
+                "Minecraft, Notepad, Calculator и другие."
             ),
 
             "parameters": {
@@ -1066,10 +1154,13 @@ TOOLS = [
 
                     "application": {
                         "type": "string",
+
                         "description": (
-                            "Название приложения"
+                            "Название приложения, которое "
+                            "нужно запустить."
                         )
                     }
+
                 },
 
                 "required": [
@@ -1087,7 +1178,8 @@ TOOLS = [
             "name": "open_website",
 
             "description": (
-                "Открыть сайт в браузере."
+                "Открыть указанный сайт "
+                "в браузере Windows."
             ),
 
             "parameters": {
@@ -1098,10 +1190,13 @@ TOOLS = [
 
                     "url": {
                         "type": "string",
+
                         "description": (
-                            "Адрес сайта"
+                            "Адрес сайта, например "
+                            "https://google.com"
                         )
                     }
+
                 },
 
                 "required": [
@@ -1110,6 +1205,7 @@ TOOLS = [
             }
         }
     },
+
 
     {
         "type": "function",
@@ -1120,7 +1216,7 @@ TOOLS = [
 
             "description": (
                 "Открыть поиск Яндекс "
-                "с указанным запросом."
+                "с указанным поисковым запросом."
             ),
 
             "parameters": {
@@ -1131,10 +1227,12 @@ TOOLS = [
 
                     "query": {
                         "type": "string",
+
                         "description": (
-                            "Поисковый запрос"
+                            "Поисковый запрос."
                         )
                     }
+
                 },
 
                 "required": [
@@ -1153,12 +1251,15 @@ TOOLS = [
 
             "description": (
                 "Получить список файлов и папок "
-                "в папке Downloads."
+                "в папке Downloads пользователя."
             ),
 
             "parameters": {
+
                 "type": "object",
+
                 "properties": {},
+
                 "required": []
             }
         }
@@ -1172,8 +1273,8 @@ TOOLS = [
             "name": "find_file",
 
             "description": (
-                "Найти файл в Downloads, Desktop "
-                "или Documents."
+                "Найти файл по имени или части имени "
+                "в папках Downloads, Desktop и Documents."
             ),
 
             "parameters": {
@@ -1184,10 +1285,12 @@ TOOLS = [
 
                     "filename": {
                         "type": "string",
+
                         "description": (
-                            "Имя или часть имени файла"
+                            "Имя или часть имени файла."
                         )
                     }
+
                 },
 
                 "required": [
@@ -1205,7 +1308,8 @@ TOOLS = [
             "name": "open_folder",
 
             "description": (
-                "Открыть папку Windows."
+                "Открыть папку или директорию "
+                "Windows по указанному пути."
             ),
 
             "parameters": {
@@ -1216,10 +1320,13 @@ TOOLS = [
 
                     "path": {
                         "type": "string",
+
                         "description": (
-                            "Путь к папке"
+                            "Полный путь к папке, например "
+                            "C:\\Users\\User\\Downloads"
                         )
                     }
+
                 },
 
                 "required": [
@@ -1237,10 +1344,9 @@ TOOLS = [
             "name": "run_windows_command",
 
             "description": (
-                "Выполнить команду Windows CMD. "
-                "Используй только для безопасных "
-                "системных действий, когда нет "
-                "отдельного инструмента."
+                "Выполнить команду Windows CMD для "
+                "системного действия. Использовать только "
+                "когда для задачи нет отдельного инструмента."
             ),
 
             "parameters": {
@@ -1251,10 +1357,12 @@ TOOLS = [
 
                     "command": {
                         "type": "string",
+
                         "description": (
-                            "Команда Windows"
+                            "Команда Windows CMD."
                         )
                     }
+
                 },
 
                 "required": [
@@ -1264,61 +1372,83 @@ TOOLS = [
         }
     },
 
-{
-    "type": "function",
-    "function": {
-        "name": "play_youtube",
-        "description": (
-            "Найти видео, музыку, фильм, сериал или мультфильм "
-            "на YouTube и открыть результаты поиска."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Что найти на YouTube"
-                }
-            },
-            "required": ["query"]
+    {
+        "type": "function",
+
+        "function": {
+
+            "name": "play_youtube",
+
+            "description": (
+                "Найти видео, музыку, фильм, сериал "
+                "или мультфильм на YouTube и открыть "
+                "результат в браузере."
+            ),
+
+            "parameters": {
+
+                "type": "object",
+
+                "properties": {
+
+                    "query": {
+                        "type": "string",
+
+                        "description": (
+                            "Что найти на YouTube."
+                        )
+                    }
+
+                },
+
+                "required": [
+                    "query"
+                ]
+            }
+        }
+    },
+
+    {
+        "type": "function",
+
+        "function": {
+
+            "name": "search_yandex_movie",
+
+            "description": (
+                "Найти фильм, сериал или мультфильм "
+                "через поиск Яндекс."
+            ),
+
+            "parameters": {
+
+                "type": "object",
+
+                "properties": {
+
+                    "query": {
+                        "type": "string",
+
+                        "description": (
+                            "Название фильма, сериала "
+                            "или мультфильма."
+                        )
+                    }
+
+                },
+
+                "required": [
+                    "query"
+                ]
+            }
         }
     }
-},
-{
-    "type": "function",
-    "function": {
-        "name": "search_yandex_movie",
-        "description": (
-            "Найти фильм, сериал или мультфильм "
-            "через поиск Яндекс."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Название фильма или сериала"
-                }
-            },
-            "required": ["query"]
-        }
-    }
-},
-{
-    "type": "function",
-    "function": {
-        "name": "open_steam",
-        "description": (
-            "Запустить Steam на компьютере Windows."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    }
-},
-    ]
+
+]
+
+
+
+
 
 
 
@@ -1421,15 +1551,15 @@ async def ask_groq(text: str):
 
 4. Если пользователь спрашивает характеристики ПК —
    используй get_pc_info.
+   
+5. Если пользователь просит открыть или запустить
+приложение — используй open_application.
 
-5. Если пользователь просит открыть приложение —
-   используй open_application.
+6. Разрешено запускать любое приложение,
+установленное на компьютере пользователя.
 
-6. Если пользователь просит открыть сайт —
-   используй open_website.
-
-7. Если пользователь говорит "найди в Яндексе" —
-   используй search_yandex.
+7. Не говори, что приложение запущено,
+пока open_application не вернул success=true.
 
 8. Если пользователь спрашивает про Downloads —
    используй get_downloads.
