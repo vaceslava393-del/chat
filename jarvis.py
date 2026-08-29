@@ -1468,37 +1468,54 @@ def execute_tool(name: str, arguments: dict):
         if name == "get_pc_info":
             return get_pc_info()
 
-        if name == "open_application":
+        elif name == "open_application":
             return open_application(
                 arguments.get("application", "")
             )
 
-        if name == "open_website":
+        elif name == "open_website":
             return open_website(
                 arguments.get("url", "")
             )
-        if name == "open_steam":
-            return open_steam()
 
-        if name == "search_yandex":
+        elif name == "search_yandex":
             return search_yandex(
                 arguments.get("query", "")
             )
 
-        if name == "play_youtube":
+        elif name == "play_youtube":
             return play_youtube(
                 arguments.get("query", "")
             )
-        if name == "search_yandex_movie":
+
+        elif name == "search_yandex_movie":
             return search_yandex_movie(
-            arguments.get("query", "")
-        )
+                arguments.get("query", "")
+            )
 
+        elif name == "get_downloads":
+            return get_downloads()
 
-        return {
-            "success": False,
-            "message": f"Неизвестный инструмент: {name}"
-        }
+        elif name == "find_file":
+            return find_file(
+                arguments.get("filename", "")
+            )
+
+        elif name == "open_folder":
+            return open_folder(
+                arguments.get("path", "")
+            )
+
+        elif name == "run_windows_command":
+            return run_windows_command(
+                arguments.get("command", "")
+            )
+
+        else:
+            return {
+                "success": False,
+                "message": f"Неизвестный инструмент: {name}"
+            }
 
     except Exception as e:
 
@@ -1506,6 +1523,8 @@ def execute_tool(name: str, arguments: dict):
             "success": False,
             "message": f"Ошибка инструмента {name}: {e}"
         }
+
+
 
 # ============================================================
 # GROQ
