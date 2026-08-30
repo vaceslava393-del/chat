@@ -6,6 +6,8 @@ import subprocess
 import webbrowser
 from pathlib import Path
 from urllib.parse import quote
+import re
+from urllib.parse import urlparse
 
 import httpx
 from dotenv import load_dotenv
@@ -193,35 +195,130 @@ print()
 
 def find_application(application: str):
 
-    application = str(
-        application
-    ).lower().strip()
+    application = str(application).strip()
 
     if not application:
-
         return None
 
-    # Точное совпадение
-    if application in ALLOWED_APPS:
+    name = application.lower()
 
-        return ALLOWED_APPS[
+    # Убираем .exe если пользователь его написал
+    if name.endswith(".exe"):
+        name = name[:-4]
+
+    # ========================================================
+    # 1. Уже найденные приложения
+    # ========================================================
+
+    for app_name, path in ALLOWED_APPS.items():
+
+        clean_name = str(app_name).lower().strip()
+
+        if clean_name.endswith(".exe"):
+            clean_name = clean_name[:-4]
+
+        if name == clean_name:
+            return path
+
+    # ========================================================
+    # 2. Windows PATH
+    # ========================================================
+
+    try:
+
+        found = shutil.which(
             application
-        ]
+        )
 
-    # Частичное совпадение
-    matches = []
+        if found:
+            return found
 
-    for name, path in ALLOWED_APPS.items():
+        found = shutil.which(
+            application + ".exe"
+        )
 
-        if application in name:
+        if found:
+            return found
 
-            matches.append(
-                (name, path)
+    except Exception:
+        pass
+
+    # ========================================================
+    # 3. Известные папки Windows
+    # ========================================================
+
+    search_locations = [
+
+        Path(
+            os.environ.get(
+                "PROGRAMFILES",
+                r"C:\Program Files"
             )
+        ),
 
-    if len(matches) == 1:
+        Path(
+            os.environ.get(
+                "PROGRAMFILES(X86)",
+                r"C:\Program Files (x86)"
+            )
+        ),
 
-        return matches[0][1]
+        Path.home() / "AppData" / "Local",
+
+        Path.home() / "AppData" / "Roaming",
+
+        Path.home() / "Desktop",
+
+        Path(
+            os.environ.get(
+                "APPDATA",
+                ""
+            )
+        ) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+
+        Path(
+            os.environ.get(
+                "PROGRAMDATA",
+                ""
+            )
+        ) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+
+    ]
+
+    # ========================================================
+    # 4. Ищем EXE
+    # ========================================================
+
+    for location in search_locations:
+
+        if not location:
+            continue
+
+        if not location.exists():
+            continue
+
+        try:
+
+            for exe in location.rglob("*.exe"):
+
+                exe_name = exe.stem.lower()
+
+                # Точное совпадение
+                if exe_name == name:
+
+                    return str(exe)
+
+                # Частичное совпадение
+                if name in exe_name:
+
+                    return str(exe)
+
+        except (
+            PermissionError,
+            OSError
+        ):
+
+            continue
 
     return None
 
@@ -234,116 +331,141 @@ def open_application(application: str):
 
     application = str(
         application
-    ).lower().strip()
+    ).strip()
 
     if not application:
 
         return {
             "success": False,
-            "message": (
-                "Название приложения "
-                "не указано."
-            )
+            "message": "Название приложения не указано."
         }
+
+    print()
+    print("==============================")
+    print("ПОИСК ПРИЛОЖЕНИЯ")
+    print("Название:", application)
+    print("==============================")
+
+    # ========================================================
+    # Специальные системные приложения
+    # ========================================================
+
+    system_apps = {
+
+        "notepad": "notepad.exe",
+        "блокнот": "notepad.exe",
+
+        "calculator": "calc.exe",
+        "калькулятор": "calc.exe",
+
+        "explorer": "explorer.exe",
+        "проводник": "explorer.exe",
+
+        "paint": "mspaint.exe",
+        "рисование": "mspaint.exe",
+
+        "cmd": "cmd.exe",
+
+    }
+
+    normalized = application.lower()
+
+    if normalized in system_apps:
+
+        program = system_apps[
+            normalized
+        ]
+
+        try:
+
+            subprocess.Popen(
+                [program],
+                shell=False
+            )
+
+            return {
+                "success": True,
+                "application": application,
+                "path": program,
+                "message": (
+                    f"Приложение "
+                    f"'{application}' запущено."
+                )
+            }
+
+        except Exception as e:
+
+            return {
+                "success": False,
+                "message": str(e)
+            }
+
+    # ========================================================
+    # Ищем приложение
+    # ========================================================
 
     program = find_application(
         application
     )
 
+    # ========================================================
+    # Не нашли
+    # ========================================================
+
     if not program:
 
-        # Обновляем список,
-        # если приложение появилось после запуска Jarvis
-        global ALLOWED_APPS
-
-        ALLOWED_APPS = scan_installed_applications()
-
-        ALLOWED_APPS.update({
-            "notepad": "notepad.exe",
-            "блокнот": "notepad.exe",
-
-            "calculator": "calc.exe",
-            "калькулятор": "calc.exe",
-
-            "explorer": "explorer.exe",
-            "проводник": "explorer.exe",
-
-            "paint": "mspaint.exe",
-            "рисование": "mspaint.exe",
-
-            "cmd": "cmd.exe",
-
-
-        })
-
-        program = find_application(
+        print(
+            "Приложение не найдено:",
             application
         )
-
-    if not program:
 
         return {
             "success": False,
             "message": (
                 f"Приложение '{application}' "
-                f"не найдено."
+                f"не найдено на компьютере."
             )
         }
 
+    print(
+        "Найдено:",
+        program
+    )
+
+    # ========================================================
+    # Запуск
+    # ========================================================
+
     try:
 
-        print(
-            "Запускаю приложение:",
-            application
-        )
+        # ----------------------------------------------------
+        # Ярлык Windows
+        # ----------------------------------------------------
 
-        print(
-            "Путь:",
-            program
-        )
-
-        # .lnk и .url лучше открывать
-        # через Windows shell
         if program.lower().endswith(
             (".lnk", ".url")
         ):
 
-            os.startfile(program)
-
-        # Системные команды
-        elif (
-            program.lower() in
-            [
-                "notepad.exe",
-                "calc.exe",
-                "explorer.exe",
-                "mspaint.exe",
-                "cmd.exe",
-            ]
-        ):
-
-            subprocess.Popen(
-                [program],
-                shell=False
+            os.startfile(
+                program
             )
 
-        # Полный путь к EXE
+        # ----------------------------------------------------
+        # EXE
+        # ----------------------------------------------------
+
         else:
 
-            if not os.path.isfile(program):
-
-                return {
-                    "success": False,
-                    "message": (
-                        "Файл приложения "
-                        f"не найден: {program}"
-                    )
-                }
-
             subprocess.Popen(
                 [program],
+                cwd=os.path.dirname(program),
                 shell=False
             )
+
+        print(
+            "УСПЕШНО ЗАПУЩЕНО:",
+            program
+        )
 
         return {
             "success": True,
@@ -356,6 +478,11 @@ def open_application(application: str):
         }
 
     except Exception as e:
+
+        print(
+            "ОШИБКА ЗАПУСКА:",
+            repr(e)
+        )
 
         return {
             "success": False,
@@ -901,7 +1028,328 @@ def open_steam():
             )
         }
 
+    # ============================================================
+    # УНИВЕРСАЛЬНОЕ ОТКРЫТИЕ
+    # ============================================================
 
+    def open_requested(target: str, target_type: str = "auto"):
+
+        target = str(target).strip()
+        target_type = str(target_type).lower().strip()
+
+        if not target:
+            return {
+                "success": False,
+                "message": "Не указано, что нужно открыть."
+            }
+
+        # --------------------------------------------------------
+        # AUTO
+        # --------------------------------------------------------
+
+        if target_type == "auto":
+
+            lower = target.lower()
+
+            # YouTube / музыка / видео
+            youtube_words = [
+                "включи музыку",
+                "включи песню",
+                "включи видео",
+                "включи ролик",
+                "найди на youtube",
+                "ютуб",
+                "youtube",
+            ]
+
+            if any(word in lower for word in youtube_words):
+
+                query = target
+
+                for word in youtube_words:
+                    query = query.replace(word, "").strip()
+
+                if not query:
+                    query = target
+
+                return play_youtube(query)
+
+            # Известные сайты
+            websites = {
+                "youtube": "https://www.youtube.com",
+                "ютуб": "https://www.youtube.com",
+                "google": "https://www.google.com",
+                "гугл": "https://www.google.com",
+                "yandex": "https://yandex.ru",
+                "яндекс": "https://yandex.ru",
+                "vk": "https://vk.com",
+                "вк": "https://vk.com",
+                "telegram web": "https://web.telegram.org",
+            }
+
+            if lower in websites:
+                return open_website(websites[lower])
+
+            # Папки
+            folders = {
+                "downloads": Path.home() / "Downloads",
+                "загрузки": Path.home() / "Downloads",
+
+                "desktop": Path.home() / "Desktop",
+                "рабочий стол": Path.home() / "Desktop",
+
+                "documents": Path.home() / "Documents",
+                "документы": Path.home() / "Documents",
+            }
+
+            if lower in folders:
+                return open_folder(str(folders[lower]))
+
+            # В остальных случаях считаем приложением
+            return open_application(target)
+
+        # --------------------------------------------------------
+        # APPLICATION
+        # --------------------------------------------------------
+
+        if target_type == "application":
+            return open_application(target)
+
+        # --------------------------------------------------------
+        # WEBSITE
+        # --------------------------------------------------------
+
+        if target_type == "website":
+
+            # Если пользователь передал название сайта
+            websites = {
+                "youtube": "https://www.youtube.com",
+                "ютуб": "https://www.youtube.com",
+                "google": "https://www.google.com",
+                "гугл": "https://www.google.com",
+                "yandex": "https://yandex.ru",
+                "яндекс": "https://yandex.ru",
+                "vk": "https://vk.com",
+                "вк": "https://vk.com",
+            }
+
+            lower = target.lower()
+
+            if lower in websites:
+                return open_website(websites[lower])
+
+            return open_website(target)
+
+        # --------------------------------------------------------
+        # YOUTUBE
+        # --------------------------------------------------------
+
+        if target_type == "youtube":
+            return play_youtube(target)
+
+        # --------------------------------------------------------
+        # FILE
+        # --------------------------------------------------------
+
+        if target_type == "file":
+
+            results = find_file(target)
+
+            if not results.get("success"):
+                return results
+
+            files = results.get("results", [])
+
+            if not files:
+                return {
+                    "success": False,
+                    "message": f"Файл '{target}' не найден."
+                }
+
+            file_path = files[0]
+
+            try:
+
+                os.startfile(file_path)
+
+                return {
+                    "success": True,
+                    "path": file_path,
+                    "message": f"Файл '{target}' открыт."
+                }
+
+            except Exception as e:
+
+                return {
+                    "success": False,
+                    "message": (
+                        f"Не удалось открыть файл: {e}"
+                    )
+                }
+
+        # --------------------------------------------------------
+        # FOLDER
+        # --------------------------------------------------------
+
+        if target_type == "folder":
+
+            folders = {
+                "downloads": Path.home() / "Downloads",
+                "загрузки": Path.home() / "Downloads",
+
+                "desktop": Path.home() / "Desktop",
+                "рабочий стол": Path.home() / "Desktop",
+
+                "documents": Path.home() / "Documents",
+                "документы": Path.home() / "Documents",
+            }
+
+            lower = target.lower()
+
+            if lower in folders:
+                return open_folder(str(folders[lower]))
+
+            return open_folder(target)
+
+        return {
+            "success": False,
+            "message": (
+                f"Неизвестный тип объекта: {target_type}"
+            )
+        }
+
+DOWNLOAD_DIR = Path.home() / "Downloads"
+
+
+async def download_file(url: str):
+
+    url = str(url).strip()
+
+    if not url:
+        return {
+            "success": False,
+            "message": "URL не указан."
+        }
+
+    parsed = urlparse(url)
+
+    if parsed.scheme not in ("http", "https"):
+        return {
+            "success": False,
+            "message": "Разрешены только HTTP и HTTPS."
+        }
+
+
+# =====================
+# DOWNLOAD_DIR
+# =====================
+    DOWNLOAD_DIR.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    filename = Path(
+        parsed.path
+    ).name
+
+    if not filename:
+        filename = "download"
+
+    # Убираем потенциально опасные символы
+    filename = re.sub(
+        r'[<>:"/\\|?*]',
+        "_",
+        filename
+    )
+
+    destination = DOWNLOAD_DIR / filename
+
+    try:
+
+        async with httpx.AsyncClient(
+            timeout=60.0,
+            follow_redirects=True
+        ) as client:
+
+            async with client.stream(
+                "GET",
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0"
+                }
+            ) as response:
+
+                response.raise_for_status()
+
+                content_length = response.headers.get(
+                    "content-length"
+                )
+
+                # Ограничение 2 ГБ
+                if content_length:
+
+                    size = int(content_length)
+
+                    if size > 2 * 1024 ** 3:
+                        return {
+                            "success": False,
+                            "message": "Файл слишком большой."
+                        }
+
+                with open(
+                    destination,
+                    "wb"
+                ) as file:
+
+                    downloaded = 0
+
+                    async for chunk in response.aiter_bytes(
+                        1024 * 1024
+                    ):
+
+                        downloaded += len(chunk)
+
+                        if downloaded > 2 * 1024 ** 3:
+
+                            file.close()
+
+                            destination.unlink(
+                                missing_ok=True
+                            )
+
+                            return {
+                                "success": False,
+                                "message": (
+                                    "Загрузка остановлена: "
+                                    "файл больше 2 ГБ."
+                                )
+                            }
+
+                        file.write(chunk)
+
+        return {
+            "success": True,
+            "path": str(destination),
+            "size_mb": round(
+                downloaded / 1024 ** 2,
+                2
+            ),
+            "message": (
+                f"Файл скачан в Downloads: "
+                f"{filename}"
+            )
+        }
+
+    except Exception as e:
+
+        destination.unlink(
+            missing_ok=True
+        )
+
+        return {
+            "success": False,
+            "message": f"Ошибка загрузки: {e}"
+        }
 
 
 # ============================================================
@@ -1106,362 +1554,410 @@ def run_windows_command(command: str):
 # ============================================================
 # TOOL DEFINITIONS
 # ============================================================
+TOOLS=[
+{
+    "type": "function",
 
-TOOLS = [
+    "function": {
 
-    {
-        "type": "function",
+        "name": "open_requested",
 
-        "function": {
+        "description": (
+            "Универсальный инструмент открытия объектов. "
+            "Используй его, когда пользователь просит открыть, "
+            "запустить или включить приложение, сайт, файл, "
+            "папку или YouTube."
+        ),
 
-            "name": "get_pc_info",
+        "parameters": {
 
-            "description": (
-                "Получить информацию о компьютере Windows: "
-                "операционная система, версия, процессор, "
-                "количество CPU, имя компьютера и место "
-                "на системном диске."
-            ),
+            "type": "object",
 
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
-    },
+            "properties": {
 
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "open_application",
-
-            "description": (
-                "Запустить любое приложение, установленное "
-                "на компьютере Windows. Можно использовать "
-                "название приложения: Chrome, Edge, Firefox, "
-                "Telegram, Discord, Steam, VS Code, Photoshop, "
-                "Minecraft, Notepad, Calculator и другие."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "application": {
-                        "type": "string",
-
-                        "description": (
-                            "Название приложения, которое "
-                            "нужно запустить."
-                        )
-                    }
-
+                "target": {
+                    "type": "string",
+                    "description": (
+                        "Название или путь объекта, "
+                        "который нужно открыть."
+                    )
                 },
 
-                "required": [
-                    "application"
-                ]
-            }
-        }
-    },
-
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "open_website",
-
-            "description": (
-                "Открыть указанный сайт "
-                "в браузере Windows."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "url": {
-                        "type": "string",
-
-                        "description": (
-                            "Адрес сайта, например "
-                            "https://google.com"
-                        )
-                    }
-
-                },
-
-                "required": [
-                    "url"
-                ]
-            }
-        }
-    },
-
-
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "search_yandex",
-
-            "description": (
-                "Открыть поиск Яндекс "
-                "с указанным поисковым запросом."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "query": {
-                        "type": "string",
-
-                        "description": (
-                            "Поисковый запрос."
-                        )
-                    }
-
-                },
-
-                "required": [
-                    "query"
-                ]
-            }
-        }
-    },
-
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "get_downloads",
-
-            "description": (
-                "Получить список файлов и папок "
-                "в папке Downloads пользователя."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {},
-
-                "required": []
-            }
-        }
-    },
-
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "find_file",
-
-            "description": (
-                "Найти файл по имени или части имени "
-                "в папках Downloads, Desktop и Documents."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "filename": {
-                        "type": "string",
-
-                        "description": (
-                            "Имя или часть имени файла."
-                        )
-                    }
-
-                },
-
-                "required": [
-                    "filename"
-                ]
-            }
-        }
-    },
-
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "open_folder",
-
-            "description": (
-                "Открыть папку или директорию "
-                "Windows по указанному пути."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "path": {
-                        "type": "string",
-
-                        "description": (
-                            "Полный путь к папке, например "
-                            "C:\\Users\\User\\Downloads"
-                        )
-                    }
-
-                },
-
-                "required": [
-                    "path"
-                ]
-            }
-        }
-    },
-
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "run_windows_command",
-
-            "description": (
-                "Выполнить команду Windows CMD для "
-                "системного действия. Использовать только "
-                "когда для задачи нет отдельного инструмента."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "command": {
-                        "type": "string",
-
-                        "description": (
-                            "Команда Windows CMD."
-                        )
-                    }
-
-                },
-
-                "required": [
-                    "command"
-                ]
-            }
-        }
-    },
-
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "play_youtube",
-
-            "description": (
-                "Найти видео, музыку, фильм, сериал "
-                "или мультфильм на YouTube и открыть "
-                "результат в браузере."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "query": {
-                        "type": "string",
-
-                        "description": (
-                            "Что найти на YouTube."
-                        )
-                    }
-
-                },
-
-                "required": [
-                    "query"
-                ]
-            }
-        }
-    },
-
-    {
-        "type": "function",
-
-        "function": {
-
-            "name": "search_yandex_movie",
-
-            "description": (
-                "Найти фильм, сериал или мультфильм "
-                "через поиск Яндекс."
-            ),
-
-            "parameters": {
-
-                "type": "object",
-
-                "properties": {
-
-                    "query": {
-                        "type": "string",
-
-                        "description": (
-                            "Название фильма, сериала "
-                            "или мультфильма."
-                        )
-                    }
-
-                },
-
-                "required": [
-                    "query"
-                ]
-            }
+                "target_type": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "application",
+                        "website",
+                        "youtube",
+                        "movie",
+                        "file",
+                        "folder"
+                    ],
+                    "description": (
+                        "Тип объекта. "
+                        "Используй auto, если тип можно определить автоматически."
+                    )
+                }
+
+            },
+
+            "required": [
+                "target",
+                "target_type"
+            ]
         }
     }
+},
+{
+    "type": "function",
 
-]
+    "function": {
+
+        "name": "download_file",
+
+        "description": (
+            "Скачать файл по прямой HTTP или HTTPS ссылке "
+            "в папку Downloads. Не запускать скачанный файл."
+        ),
+
+        "parameters": {
+
+            "type": "object",
+
+            "properties": {
+
+                "url": {
+                    "type": "string",
+                    "description": (
+                        "Прямая HTTP или HTTPS ссылка на файл."
+                    )
+                }
+
+            },
+
+            "required": [
+                "url"
+            ]
+        }
+    }
+}
+    ]
 
 
 
+# ============================================================
+# UNIVERSAL OPEN
+# ============================================================
 
+def open_requested(target: str, target_type: str = "auto"):
 
+    target = str(target).strip()
+    target_type = str(target_type).lower().strip()
 
+    if not target:
+        return {
+            "success": False,
+            "message": "Не указано, что нужно открыть."
+        }
+    if target_type == "movie":
+        return search_yandex_movie(target)
 
+    # ========================================================
+    # APPLICATION
+    # ========================================================
 
+    if target_type == "application":
 
+        return open_application(target)
 
+    # ========================================================
+    # WEBSITE
+    # ========================================================
 
+    if target_type == "website":
+
+        websites = {
+            "youtube": "https://www.youtube.com",
+            "ютуб": "https://www.youtube.com",
+
+            "google": "https://www.google.com",
+            "гугл": "https://www.google.com",
+
+            "yandex": "https://yandex.ru",
+            "яндекс": "https://yandex.ru",
+
+            "vk": "https://vk.com",
+            "вк": "https://vk.com",
+
+            "telegram": "https://web.telegram.org",
+            "телеграм": "https://web.telegram.org",
+        }
+
+        url = websites.get(
+            target.lower(),
+            target
+        )
+
+        return open_website(url)
+
+    # ========================================================
+    # YOUTUBE
+    # ========================================================
+
+    if target_type == "youtube":
+
+        return play_youtube(target)
+
+    # ========================================================
+    # FILE
+    # ========================================================
+
+    if target_type == "file":
+
+        result = find_file(target)
+
+        if not result.get("success"):
+            return result
+
+        files = result.get("results", [])
+
+        if not files:
+
+            return {
+                "success": False,
+                "message": (
+                    f"Файл '{target}' не найден."
+                )
+            }
+
+        file_path = files[0]
+
+        try:
+
+            os.startfile(file_path)
+
+            return {
+                "success": True,
+                "path": file_path,
+                "message": (
+                    f"Файл '{target}' открыт."
+                )
+            }
+
+        except Exception as e:
+
+            return {
+                "success": False,
+                "message": (
+                    f"Не удалось открыть файл: {e}"
+                )
+            }
+
+    # ========================================================
+    # FOLDER
+    # ========================================================
+
+    if target_type == "folder":
+
+        folders = {
+
+            "downloads":
+                Path.home() / "Downloads",
+
+            "загрузки":
+                Path.home() / "Downloads",
+
+            "desktop":
+                Path.home() / "Desktop",
+
+            "рабочий стол":
+                Path.home() / "Desktop",
+
+            "documents":
+                Path.home() / "Documents",
+
+            "документы":
+                Path.home() / "Documents",
+
+        }
+
+        folder = folders.get(
+            target.lower()
+        )
+
+        if folder:
+
+            return open_folder(
+                str(folder)
+            )
+
+        return open_folder(target)
+
+    # ========================================================
+    # AUTO
+    # ========================================================
+
+    if target_type == "auto":
+
+        lower = target.lower().strip()
+
+        # ----------------------------------------------------
+        # Папки
+        # ----------------------------------------------------
+
+        folders = {
+
+            "downloads":
+                Path.home() / "Downloads",
+
+            "загрузки":
+                Path.home() / "Downloads",
+
+            "desktop":
+                Path.home() / "Desktop",
+
+            "рабочий стол":
+                Path.home() / "Desktop",
+
+            "documents":
+                Path.home() / "Documents",
+
+            "документы":
+                Path.home() / "Documents",
+
+        }
+
+        if lower in folders:
+
+            return open_folder(
+                str(folders[lower])
+            )
+
+        # ----------------------------------------------------
+        # Сайты
+        # ----------------------------------------------------
+
+        websites = {
+
+            "youtube":
+                "https://www.youtube.com",
+
+            "ютуб":
+                "https://www.youtube.com",
+
+            "google":
+                "https://www.google.com",
+
+            "гугл":
+                "https://www.google.com",
+
+            "yandex":
+                "https://yandex.ru",
+
+            "яндекс":
+                "https://yandex.ru",
+
+            "vk":
+                "https://vk.com",
+
+            "вк":
+                "https://vk.com",
+
+            "telegram":
+                "https://web.telegram.org",
+
+        }
+
+        if lower in websites:
+
+            return open_website(
+                websites[lower]
+            )
+
+        # ----------------------------------------------------
+        # Музыка / видео
+        # ----------------------------------------------------
+
+        youtube_prefixes = [
+
+            "включи музыку ",
+            "включи песню ",
+            "включи видео ",
+            "включи ролик ",
+            "найди на youtube ",
+            "найди на ютуб ",
+
+        ]
+
+        for prefix in youtube_prefixes:
+
+            if lower.startswith(prefix):
+
+                query = target[
+                    len(prefix):
+                ].strip()
+
+                return play_youtube(
+                    query
+                )
+
+        # ----------------------------------------------------
+        # Файл
+        # ----------------------------------------------------
+
+        file_result = find_file(target)
+
+        if file_result.get("success"):
+
+            files = file_result.get(
+                "results",
+                []
+            )
+
+            if files:
+
+                try:
+
+                    os.startfile(
+                        files[0]
+                    )
+
+                    return {
+                        "success": True,
+                        "path": files[0],
+                        "message": (
+                            f"Файл '{target}' открыт."
+                        )
+                    }
+
+                except Exception:
+                    pass
+
+        # ----------------------------------------------------
+        # В последнюю очередь приложение
+        # ----------------------------------------------------
+
+        return open_application(
+            target
+        )
+
+    # ========================================================
+    # UNKNOWN TYPE
+    # ========================================================
+
+    return {
+        "success": False,
+        "message": (
+            f"Неизвестный тип объекта: "
+            f"{target_type}"
+        )
+    }
 
 # ============================================================
 # ВЫПОЛНЕНИЕ TOOL
 # ============================================================
-
-def execute_tool(name: str, arguments: dict):
+async def execute_tool(name: str, arguments: dict):
 
     try:
 
@@ -1511,6 +2007,17 @@ def execute_tool(name: str, arguments: dict):
                 arguments.get("command", "")
             )
 
+        elif name == "open_requested":
+            return open_requested(
+                arguments.get("target", ""),
+                arguments.get("target_type", "auto")
+            )
+
+        elif name == "download_file":
+            return await download_file(
+                arguments.get("url", "")
+            )
+
         else:
             return {
                 "success": False,
@@ -1521,13 +2028,10 @@ def execute_tool(name: str, arguments: dict):
 
         return {
             "success": False,
-            "message": f"Ошибка инструмента {name}: {e}"
+            "message": (
+                f"Ошибка инструмента {name}: {e}"
+            )
         }
-
-
-
-# ============================================================
-# GROQ
 # ============================================================
 
 async def ask_groq(text: str):
@@ -1629,6 +2133,47 @@ application="steam".
 
 21. Не используй run_windows_command для запуска Steam,
 если можно использовать open_application.
+
+22. Если пользователь просит открыть, запустить или включить
+что-либо, используй open_requested.
+
+23. open_requested является главным универсальным инструментом
+для открытия объектов.
+
+24. Для приложения используй:
+target_type="application"
+
+25. Для сайта используй:
+target_type="website"
+
+26. Для YouTube, музыки, видео или песни используй:
+target_type="youtube"
+
+27. Для файла используй:
+target_type="file"
+
+28. Для папки используй:
+target_type="folder"
+
+29. Если тип объекта очевиден, не задавай уточняющих вопросов.
+
+30. Если пользователь говорит "открой X", используй
+open_requested с target="X" и максимально подходящим
+target_type.
+
+31. После выполнения инструмента сообщай только результат
+инструмента.
+
+32. Если success=true, сообщай, что объект действительно
+открыт или запущен.
+
+33. Если success= false, не утверждай, что объект был открыт.
+
+31. После выполнения инструмента сообщай только результат инструмента.
+
+32. Если инструмент вернул success = true, сообщай, что объект открыт или запущен.
+
+33. Если инструмент вернул success = false,не говори, что объект был открыт.
 """
 
     messages = [
@@ -1833,7 +2378,7 @@ application="steam".
                 # Выполнение инструмента
                 # --------------------------------------------
 
-                tool_result = execute_tool(
+                tool_result = await execute_tool(
                     name,
                     arguments
                 )
