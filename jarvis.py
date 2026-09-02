@@ -1,13 +1,12 @@
 import os
 import json
 import platform
+import re
 import shutil
 import subprocess
 import webbrowser
 from pathlib import Path
-from urllib.parse import quote
-import re
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 from dotenv import load_dotenv
@@ -33,15 +32,15 @@ GROQ_URL = os.getenv(
     "https://api.groq.com/openai/v1/chat/completions"
 )
 
-app = FastAPI(title="My Jarvis")
-
 MAX_HISTORY = 10
 
 conversation_history = []
 
+app = FastAPI(title="My Jarvis")
+
 
 # ============================================================
-# ПРОВЕРКА GROQ
+# GROQ CHECK
 # ============================================================
 
 if not GROQ_API_KEY:
@@ -51,11 +50,10 @@ else:
 
 
 # ============================================================
-# АВТОМАТИЧЕСКИЙ СПИСОК ПРИЛОЖЕНИЙ WINDOWS
+# WINDOWS APPLICATIONS
 # ============================================================
 
 def get_start_menu_locations():
-
     locations = []
 
     appdata = os.environ.get("APPDATA")
@@ -79,20 +77,15 @@ def get_start_menu_locations():
             / "Programs"
         )
 
-    desktop = Path.home() / "Desktop"
-
-    locations.append(desktop)
+    locations.append(Path.home() / "Desktop")
 
     return locations
 
 
 def normalize_app_name(name: str):
-
     name = str(name).lower().strip()
 
-    # Убираем расширения ярлыков
     for extension in [".lnk", ".url", ".exe"]:
-
         if name.endswith(extension):
             name = name[:-len(extension)]
 
@@ -100,69 +93,33 @@ def normalize_app_name(name: str):
 
 
 def scan_installed_applications():
-
     applications = {}
 
-    locations = get_start_menu_locations()
-
-    for location in locations:
+    for location in get_start_menu_locations():
 
         if not location.exists():
             continue
 
         try:
-
             for item in location.rglob("*"):
 
                 if not item.is_file():
                     continue
 
-                # Обычные EXE
-                if item.suffix.lower() == ".exe":
+                if item.suffix.lower() in (".exe", ".lnk", ".url"):
 
-                    name = normalize_app_name(
-                        item.stem
-                    )
+                    name = normalize_app_name(item.stem)
 
                     if name:
                         applications[name] = str(item)
 
-                # Ярлыки Windows
-                elif item.suffix.lower() == ".lnk":
-
-                    name = normalize_app_name(
-                        item.stem
-                    )
-
-                    if name:
-                        applications[name] = str(item)
-
-                # Интернет-ярлыки
-                elif item.suffix.lower() == ".url":
-
-                    name = normalize_app_name(
-                        item.stem
-                    )
-
-                    if name:
-                        applications[name] = str(item)
-
-        except (
-            PermissionError,
-            OSError
-        ):
+        except (PermissionError, OSError):
             continue
 
     return applications
 
 
-# Кэш приложений.
-# Он обновляется при запуске программы.
-ALLOWED_APPS = scan_installed_applications()
-
-
-# Дополнительные системные приложения
-ALLOWED_APPS.update({
+SYSTEM_APPS = {
     "notepad": "notepad.exe",
     "блокнот": "notepad.exe",
 
@@ -176,21 +133,19 @@ ALLOWED_APPS.update({
     "рисование": "mspaint.exe",
 
     "cmd": "cmd.exe",
+}
 
 
-})
-
+ALLOWED_APPS = scan_installed_applications()
+ALLOWED_APPS.update(SYSTEM_APPS)
 
 print()
-print(
-    f"Найдено приложений: "
-    f"{len(ALLOWED_APPS)}"
-)
+print(f"Найдено приложений: {len(ALLOWED_APPS)}")
 print()
 
 
 # ============================================================
-# ПОИСК ПРИЛОЖЕНИЯ
+# FIND APPLICATION
 # ============================================================
 
 def find_application(application: str):
@@ -200,15 +155,21 @@ def find_application(application: str):
     if not application:
         return None
 
-    name = application.lower()
+    name = application.lower().strip()
 
-    # Убираем .exe если пользователь его написал
     if name.endswith(".exe"):
         name = name[:-4]
 
-    # ========================================================
-    # 1. Уже найденные приложения
-    # ========================================================
+    # --------------------------------------------------------
+    # SYSTEM APPS
+    # --------------------------------------------------------
+
+    if name in SYSTEM_APPS:
+        return SYSTEM_APPS[name]
+
+    # --------------------------------------------------------
+    # SCANNED APPLICATIONS
+    # --------------------------------------------------------
 
     for app_name, path in ALLOWED_APPS.items():
 
@@ -220,22 +181,18 @@ def find_application(application: str):
         if name == clean_name:
             return path
 
-    # ========================================================
-    # 2. Windows PATH
-    # ========================================================
+    # --------------------------------------------------------
+    # WINDOWS PATH
+    # --------------------------------------------------------
 
     try:
 
-        found = shutil.which(
-            application
-        )
+        found = shutil.which(application)
 
         if found:
             return found
 
-        found = shutil.which(
-            application + ".exe"
-        )
+        found = shutil.which(application + ".exe")
 
         if found:
             return found
@@ -243,12 +200,11 @@ def find_application(application: str):
     except Exception:
         pass
 
-    # ========================================================
-    # 3. Известные папки Windows
-    # ========================================================
+    # --------------------------------------------------------
+    # COMMON LOCATIONS
+    # --------------------------------------------------------
 
-    search_locations = [
-
+    locations = [
         Path(
             os.environ.get(
                 "PROGRAMFILES",
@@ -270,29 +226,27 @@ def find_application(application: str):
         Path.home() / "Desktop",
 
         Path(
-            os.environ.get(
-                "APPDATA",
-                ""
-            )
-        ) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
+            os.environ.get("APPDATA", "")
+        )
+        / "Microsoft"
+        / "Windows"
+        / "Start Menu"
+        / "Programs",
 
         Path(
-            os.environ.get(
-                "PROGRAMDATA",
-                ""
-            )
-        ) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
-
+            os.environ.get("PROGRAMDATA", "")
+        )
+        / "Microsoft"
+        / "Windows"
+        / "Start Menu"
+        / "Programs",
     ]
 
-    # ========================================================
-    # 4. Ищем EXE
-    # ========================================================
+    # --------------------------------------------------------
+    # SEARCH
+    # --------------------------------------------------------
 
-    for location in search_locations:
-
-        if not location:
-            continue
+    for location in locations:
 
         if not location.exists():
             continue
@@ -303,38 +257,24 @@ def find_application(application: str):
 
                 exe_name = exe.stem.lower()
 
-                # Точное совпадение
                 if exe_name == name:
-
                     return str(exe)
 
-                # Частичное совпадение
-                if name in exe_name:
-
-                    return str(exe)
-
-        except (
-            PermissionError,
-            OSError
-        ):
-
+        except (PermissionError, OSError):
             continue
 
     return None
 
 
 # ============================================================
-# ЗАПУСК ПРИЛОЖЕНИЯ
+# OPEN APPLICATION
 # ============================================================
 
 def open_application(application: str):
 
-    application = str(
-        application
-    ).strip()
+    application = str(application).strip()
 
     if not application:
-
         return {
             "success": False,
             "message": "Название приложения не указано."
@@ -346,71 +286,7 @@ def open_application(application: str):
     print("Название:", application)
     print("==============================")
 
-    # ========================================================
-    # Специальные системные приложения
-    # ========================================================
-
-    system_apps = {
-
-        "notepad": "notepad.exe",
-        "блокнот": "notepad.exe",
-
-        "calculator": "calc.exe",
-        "калькулятор": "calc.exe",
-
-        "explorer": "explorer.exe",
-        "проводник": "explorer.exe",
-
-        "paint": "mspaint.exe",
-        "рисование": "mspaint.exe",
-
-        "cmd": "cmd.exe",
-
-    }
-
-    normalized = application.lower()
-
-    if normalized in system_apps:
-
-        program = system_apps[
-            normalized
-        ]
-
-        try:
-
-            subprocess.Popen(
-                [program],
-                shell=False
-            )
-
-            return {
-                "success": True,
-                "application": application,
-                "path": program,
-                "message": (
-                    f"Приложение "
-                    f"'{application}' запущено."
-                )
-            }
-
-        except Exception as e:
-
-            return {
-                "success": False,
-                "message": str(e)
-            }
-
-    # ========================================================
-    # Ищем приложение
-    # ========================================================
-
-    program = find_application(
-        application
-    )
-
-    # ========================================================
-    # Не нашли
-    # ========================================================
+    program = find_application(application)
 
     if not program:
 
@@ -427,40 +303,34 @@ def open_application(application: str):
             )
         }
 
-    print(
-        "Найдено:",
-        program
-    )
-
-    # ========================================================
-    # Запуск
-    # ========================================================
+    print("Найдено:", program)
 
     try:
 
-        # ----------------------------------------------------
-        # Ярлык Windows
-        # ----------------------------------------------------
-
-        if program.lower().endswith(
+        # Windows shortcut
+        if str(program).lower().endswith(
             (".lnk", ".url")
         ):
 
-            os.startfile(
-                program
-            )
-
-        # ----------------------------------------------------
-        # EXE
-        # ----------------------------------------------------
+            os.startfile(program)
 
         else:
 
-            subprocess.Popen(
-                [program],
-                cwd=os.path.dirname(program),
-                shell=False
-            )
+            # System command such as notepad.exe
+            if os.path.dirname(program):
+
+                subprocess.Popen(
+                    [program],
+                    cwd=os.path.dirname(program),
+                    shell=False
+                )
+
+            else:
+
+                subprocess.Popen(
+                    [program],
+                    shell=False
+                )
 
         print(
             "УСПЕШНО ЗАПУЩЕНО:",
@@ -470,7 +340,7 @@ def open_application(application: str):
         return {
             "success": True,
             "application": application,
-            "path": program,
+            "path": str(program),
             "message": (
                 f"Приложение "
                 f"'{application}' запущено."
@@ -494,7 +364,7 @@ def open_application(application: str):
 
 
 # ============================================================
-# СПИСОК ДОСТУПНЫХ ПРИЛОЖЕНИЙ
+# APPLICATION LIST
 # ============================================================
 
 def get_applications():
@@ -502,26 +372,7 @@ def get_applications():
     global ALLOWED_APPS
 
     ALLOWED_APPS = scan_installed_applications()
-
-    ALLOWED_APPS.update({
-
-
-        "notepad": "notepad.exe",
-        "блокнот": "notepad.exe",
-
-        "calculator": "calc.exe",
-        "калькулятор": "calc.exe",
-
-        "explorer": "explorer.exe",
-        "проводник": "explorer.exe",
-
-        "paint": "mspaint.exe",
-        "рисование": "mspaint.exe",
-
-        "cmd": "cmd.exe",
-
-
-    })
+    ALLOWED_APPS.update(SYSTEM_APPS)
 
     return {
         "success": True,
@@ -531,28 +382,91 @@ def get_applications():
         )
     }
 
+
+# ============================================================
+# STEAM
+# ============================================================
+
 def open_steam():
+
+    possible_paths = [
+
+        Path(
+            os.environ.get(
+                "PROGRAMFILES(X86)",
+                r"C:\Program Files (x86)"
+            )
+        )
+        / "Steam"
+        / "steam.exe",
+
+        Path(
+            os.environ.get(
+                "PROGRAMFILES",
+                r"C:\Program Files"
+            )
+        )
+        / "Steam"
+        / "steam.exe",
+
+        Path.home()
+        / "AppData"
+        / "Local"
+        / "Steam"
+        / "steam.exe",
+    ]
+
+    steam_path = None
+
+    for path in possible_paths:
+
+        if path.is_file():
+            steam_path = path
+            break
+
+    if steam_path is None:
+
+        found = shutil.which("steam.exe")
+
+        if found:
+            steam_path = Path(found)
+
+    if steam_path is None:
+
+        return {
+            "success": False,
+            "message": (
+                "Steam не найден. "
+                "Проверь, установлен ли Steam."
+            )
+        }
+
     try:
+
         subprocess.Popen(
-            ["steam.exe"],
+            [str(steam_path)],
             shell=False
         )
 
         return {
             "success": True,
+            "application": "Steam",
+            "path": str(steam_path),
             "message": "Steam запущен."
         }
 
     except Exception as e:
+
         return {
             "success": False,
-            "message": f"Не удалось запустить Steam: {e}"
+            "message": (
+                f"Не удалось запустить Steam: {e}"
+            )
         }
 
 
-
 # ============================================================
-# ИНФОРМАЦИЯ О ПК
+# PC INFO
 # ============================================================
 
 def get_pc_info():
@@ -570,12 +484,19 @@ def get_pc_info():
 
         return {
             "success": True,
+
             "system": platform.system(),
+
             "release": platform.release(),
+
             "version": platform.version(),
+
             "machine": platform.machine(),
+
             "processor": platform.processor(),
+
             "computer_name": platform.node(),
+
             "cpu_count": os.cpu_count(),
 
             "disk_total_gb": round(
@@ -601,8 +522,9 @@ def get_pc_info():
             "error": str(e)
         }
 
+
 # ============================================================
-# YOUTUBE — АВТОМАТИЧЕСКОЕ ОТКРЫТИЕ ПЕРВОГО ВИДЕО
+# YOUTUBE
 # ============================================================
 
 def play_youtube(query: str):
@@ -610,6 +532,7 @@ def play_youtube(query: str):
     query = str(query).strip()
 
     if not query:
+
         return {
             "success": False,
             "message": "Название видео не указано."
@@ -627,12 +550,13 @@ def play_youtube(query: str):
             + encoded_query
         )
 
-        # Получаем страницу поиска YouTube
         with httpx.Client(
             timeout=15.0,
+            follow_redirects=True,
             headers={
                 "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "Mozilla/5.0 "
+                    "(Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 "
                     "(KHTML, like Gecko) "
                     "Chrome/131.0 Safari/537.36"
@@ -640,12 +564,12 @@ def play_youtube(query: str):
             }
         ) as client:
 
-            response = client.get(search_url)
+            response = client.get(
+                search_url
+            )
 
         if response.status_code != 200:
 
-            # Если YouTube не дал страницу,
-            # хотя бы открываем обычный поиск
             webbrowser.open(
                 search_url,
                 new=2
@@ -656,37 +580,24 @@ def play_youtube(query: str):
                 "query": query,
                 "url": search_url,
                 "message": (
-                    f"Открываю поиск YouTube: {query}"
+                    f"Открываю поиск YouTube: "
+                    f"{query}"
                 )
             }
 
         html = response.text
-
-        # ----------------------------------------------------
-        # Ищем videoId в HTML
-        # ----------------------------------------------------
-
-        import re
 
         video_ids = re.findall(
             r'"videoId":"([^"]+)"',
             html
         )
 
-        # Убираем дубликаты
         unique_video_ids = []
 
         for video_id in video_ids:
 
             if video_id not in unique_video_ids:
-
-                unique_video_ids.append(
-                    video_id
-                )
-
-        # ----------------------------------------------------
-        # Нашли видео
-        # ----------------------------------------------------
+                unique_video_ids.append(video_id)
 
         if unique_video_ids:
 
@@ -702,49 +613,40 @@ def play_youtube(query: str):
                 new=2
             )
 
-            if not opened:
+            if opened:
 
                 return {
-                    "success": False,
+                    "success": True,
+                    "query": query,
+                    "video_id": video_id,
+                    "url": video_url,
                     "message": (
-                        "Не удалось открыть видео YouTube."
+                        f"Открываю видео YouTube: "
+                        f"{query}"
                     )
                 }
-
-            return {
-                "success": True,
-                "query": query,
-                "video_id": video_id,
-                "url": video_url,
-                "message": (
-                    f"Открываю видео YouTube: {query}"
-                )
-            }
-
-        # ----------------------------------------------------
-        # Если videoId не нашли
-        # ----------------------------------------------------
 
         opened = webbrowser.open(
             search_url,
             new=2
         )
 
-        if not opened:
+        if opened:
 
             return {
-                "success": False,
+                "success": True,
+                "query": query,
+                "url": search_url,
                 "message": (
-                    "Не удалось открыть YouTube."
+                    f"Открываю поиск YouTube: "
+                    f"{query}"
                 )
             }
 
         return {
-            "success": True,
-            "query": query,
-            "url": search_url,
+            "success": False,
             "message": (
-                f"Открываю поиск YouTube: {query}"
+                "Не удалось открыть YouTube."
             )
         }
 
@@ -759,7 +661,7 @@ def play_youtube(query: str):
 
 
 # ============================================================
-# ЯНДЕКС
+# YANDEX SEARCH
 # ============================================================
 
 def search_yandex(query: str):
@@ -767,6 +669,7 @@ def search_yandex(query: str):
     query = str(query).strip()
 
     if not query:
+
         return {
             "success": False,
             "message": "Поисковый запрос пустой."
@@ -784,19 +687,18 @@ def search_yandex(query: str):
             + encoded_query
         )
 
-        print("Открываю Яндекс:")
-        print(url)
-
         opened = webbrowser.open(
             url,
             new=2
         )
 
         if not opened:
+
             return {
                 "success": False,
                 "message": (
-                    "Windows не смог открыть браузер."
+                    "Windows не смог "
+                    "открыть браузер."
                 )
             }
 
@@ -805,7 +707,8 @@ def search_yandex(query: str):
             "query": query,
             "url": url,
             "message": (
-                f"Открываю поиск Яндекс: {query}"
+                f"Открываю поиск Яндекс: "
+                f"{query}"
             )
         }
 
@@ -818,14 +721,18 @@ def search_yandex(query: str):
             )
         }
 
+
+
 # ============================================================
-# ЯНДЕКС-ФИЛЬМЫ
+# YANDEX MOVIE SEARCH
 # ============================================================
+
 def search_yandex_movie(query: str):
 
     query = str(query).strip()
 
     if not query:
+
         return {
             "success": False,
             "message": "Название фильма не указано."
@@ -833,61 +740,126 @@ def search_yandex_movie(query: str):
 
     try:
 
-        search_text = f"{query} смотреть фильм"
+        search_text = f"{query} фильм"
 
         encoded_query = quote(
             search_text,
             safe=""
         )
 
-        url = (
+        search_url = (
             "https://yandex.ru/search/?text="
             + encoded_query
         )
 
+        print()
+        print("==============================")
+        print("ПОИСК ФИЛЬМА")
+        print("Запрос:", query)
+        print("URL:", search_url)
+        print("==============================")
+
         opened = webbrowser.open(
-            url,
+            search_url,
             new=2
         )
 
         if not opened:
+
             return {
                 "success": False,
-                "message": "Не удалось открыть Яндекс."
+                "message": (
+                    "Не удалось открыть браузер "
+                    "для поиска фильма."
+                )
             }
 
         return {
             "success": True,
             "query": query,
-            "url": url,
-            "message": f"Ищу фильм «{query}» в Яндексе."
+            "url": search_url,
+            "message": (
+                f"Открываю поиск фильма "
+                f"«{query}» в Яндексе."
+            )
         }
 
     except Exception as e:
 
+        print(
+            "Ошибка поиска фильма:",
+            repr(e)
+        )
+
         return {
             "success": False,
-            "message": f"Ошибка Яндекса: {e}"
+            "message": (
+                f"Ошибка поиска фильма: {e}"
+            )
         }
 
 
+
+
 # ============================================================
-# ОТКРЫТЬ САЙТ
+# WEBSITE
 # ============================================================
+
+KNOWN_WEBSITES = {
+
+    "youtube":
+        "https://www.youtube.com",
+
+    "ютуб":
+        "https://www.youtube.com",
+
+    "google":
+        "https://www.google.com",
+
+    "гугл":
+        "https://www.google.com",
+
+    "yandex":
+        "https://yandex.ru",
+
+    "яндекс":
+        "https://yandex.ru",
+
+    "vk":
+        "https://vk.com",
+
+    "вк":
+        "https://vk.com",
+
+    "telegram":
+        "https://web.telegram.org",
+
+    "телеграм":
+        "https://web.telegram.org",
+}
+
 
 def open_website(url: str):
 
     url = str(url).strip()
 
     if not url:
+
         return {
             "success": False,
             "message": "URL пустой."
         }
 
+    if url.lower() in KNOWN_WEBSITES:
+
+        url = KNOWN_WEBSITES[
+            url.lower()
+        ]
+
     if not url.startswith(
         ("http://", "https://")
     ):
+
         url = "https://" + url
 
     try:
@@ -898,6 +870,7 @@ def open_website(url: str):
         )
 
         if not opened:
+
             return {
                 "success": False,
                 "message": (
@@ -922,433 +895,78 @@ def open_website(url: str):
             )
         }
 
+
 # ============================================================
-# STEAM
+# FOLDERS
 # ============================================================
 
-def open_steam():
+KNOWN_FOLDERS = {
 
-    possible_paths = [
+    "downloads":
+        Path.home() / "Downloads",
 
-        # Обычный Steam
-        Path(
-            os.environ.get(
-                "PROGRAMFILES(X86)",
-                r"C:\Program Files (x86)"
-            )
-        ) / "Steam" / "steam.exe",
+    "загрузки":
+        Path.home() / "Downloads",
 
-        # 64-bit вариант
-        Path(
-            os.environ.get(
-                "PROGRAMFILES",
-                r"C:\Program Files"
-            )
-        ) / "Steam" / "steam.exe",
+    "desktop":
+        Path.home() / "Desktop",
 
-        # Если Steam установлен в AppData
-        Path.home() / "AppData" / "Local" / "Steam" / "steam.exe",
+    "рабочий стол":
+        Path.home() / "Desktop",
 
-    ]
+    "documents":
+        Path.home() / "Documents",
 
-    # --------------------------------------------------------
-    # Ищем Steam
-    # --------------------------------------------------------
+    "документы":
+        Path.home() / "Documents",
+}
 
-    steam_path = None
 
-    for path in possible_paths:
+def open_folder(path: str):
 
-        if path.is_file():
+    path = os.path.expandvars(path)
+    path = os.path.expanduser(path)
 
-            steam_path = path
-            break
-
-    # --------------------------------------------------------
-    # Если не нашли по стандартному пути,
-    # пробуем Windows PATH
-    # --------------------------------------------------------
-
-    if steam_path is None:
-
-        import shutil
-
-        found = shutil.which("steam.exe")
-
-        if found:
-
-            steam_path = Path(found)
-
-    # --------------------------------------------------------
-    # Steam не найден
-    # --------------------------------------------------------
-
-    if steam_path is None:
+    if not path:
 
         return {
             "success": False,
-            "message": (
-                "Steam не найден. "
-                "Проверь, установлен ли Steam."
-            )
+            "message": "Путь не указан."
         }
 
-    # --------------------------------------------------------
-    # Запускаем Steam
-    # --------------------------------------------------------
+    if path.lower() in KNOWN_FOLDERS:
+
+        path = str(
+            KNOWN_FOLDERS[path.lower()]
+        )
 
     try:
 
-        print(
-            "Запускаю Steam:"
-        )
+        if not os.path.exists(path):
 
-        print(
-            steam_path
-        )
-
-        subprocess.Popen(
-            [str(steam_path)],
-            shell=False
-        )
-
-        return {
-            "success": True,
-            "application": "steam",
-            "path": str(steam_path),
-            "message": "Steam запущен."
-        }
-
-    except Exception as e:
-
-        return {
-            "success": False,
-            "message": (
-                f"Не удалось запустить Steam: {e}"
-            )
-        }
-
-    # ============================================================
-    # УНИВЕРСАЛЬНОЕ ОТКРЫТИЕ
-    # ============================================================
-
-    def open_requested(target: str, target_type: str = "auto"):
-
-        target = str(target).strip()
-        target_type = str(target_type).lower().strip()
-
-        if not target:
             return {
                 "success": False,
-                "message": "Не указано, что нужно открыть."
-            }
-
-        # --------------------------------------------------------
-        # AUTO
-        # --------------------------------------------------------
-
-        if target_type == "auto":
-
-            lower = target.lower()
-
-            # YouTube / музыка / видео
-            youtube_words = [
-                "включи музыку",
-                "включи песню",
-                "включи видео",
-                "включи ролик",
-                "найди на youtube",
-                "ютуб",
-                "youtube",
-            ]
-
-            if any(word in lower for word in youtube_words):
-
-                query = target
-
-                for word in youtube_words:
-                    query = query.replace(word, "").strip()
-
-                if not query:
-                    query = target
-
-                return play_youtube(query)
-
-            # Известные сайты
-            websites = {
-                "youtube": "https://www.youtube.com",
-                "ютуб": "https://www.youtube.com",
-                "google": "https://www.google.com",
-                "гугл": "https://www.google.com",
-                "yandex": "https://yandex.ru",
-                "яндекс": "https://yandex.ru",
-                "vk": "https://vk.com",
-                "вк": "https://vk.com",
-                "telegram web": "https://web.telegram.org",
-            }
-
-            if lower in websites:
-                return open_website(websites[lower])
-
-            # Папки
-            folders = {
-                "downloads": Path.home() / "Downloads",
-                "загрузки": Path.home() / "Downloads",
-
-                "desktop": Path.home() / "Desktop",
-                "рабочий стол": Path.home() / "Desktop",
-
-                "documents": Path.home() / "Documents",
-                "документы": Path.home() / "Documents",
-            }
-
-            if lower in folders:
-                return open_folder(str(folders[lower]))
-
-            # В остальных случаях считаем приложением
-            return open_application(target)
-
-        # --------------------------------------------------------
-        # APPLICATION
-        # --------------------------------------------------------
-
-        if target_type == "application":
-            return open_application(target)
-
-        # --------------------------------------------------------
-        # WEBSITE
-        # --------------------------------------------------------
-
-        if target_type == "website":
-
-            # Если пользователь передал название сайта
-            websites = {
-                "youtube": "https://www.youtube.com",
-                "ютуб": "https://www.youtube.com",
-                "google": "https://www.google.com",
-                "гугл": "https://www.google.com",
-                "yandex": "https://yandex.ru",
-                "яндекс": "https://yandex.ru",
-                "vk": "https://vk.com",
-                "вк": "https://vk.com",
-            }
-
-            lower = target.lower()
-
-            if lower in websites:
-                return open_website(websites[lower])
-
-            return open_website(target)
-
-        # --------------------------------------------------------
-        # YOUTUBE
-        # --------------------------------------------------------
-
-        if target_type == "youtube":
-            return play_youtube(target)
-
-        # --------------------------------------------------------
-        # FILE
-        # --------------------------------------------------------
-
-        if target_type == "file":
-
-            results = find_file(target)
-
-            if not results.get("success"):
-                return results
-
-            files = results.get("results", [])
-
-            if not files:
-                return {
-                    "success": False,
-                    "message": f"Файл '{target}' не найден."
-                }
-
-            file_path = files[0]
-
-            try:
-
-                os.startfile(file_path)
-
-                return {
-                    "success": True,
-                    "path": file_path,
-                    "message": f"Файл '{target}' открыт."
-                }
-
-            except Exception as e:
-
-                return {
-                    "success": False,
-                    "message": (
-                        f"Не удалось открыть файл: {e}"
-                    )
-                }
-
-        # --------------------------------------------------------
-        # FOLDER
-        # --------------------------------------------------------
-
-        if target_type == "folder":
-
-            folders = {
-                "downloads": Path.home() / "Downloads",
-                "загрузки": Path.home() / "Downloads",
-
-                "desktop": Path.home() / "Desktop",
-                "рабочий стол": Path.home() / "Desktop",
-
-                "documents": Path.home() / "Documents",
-                "документы": Path.home() / "Documents",
-            }
-
-            lower = target.lower()
-
-            if lower in folders:
-                return open_folder(str(folders[lower]))
-
-            return open_folder(target)
-
-        return {
-            "success": False,
-            "message": (
-                f"Неизвестный тип объекта: {target_type}"
-            )
-        }
-
-DOWNLOAD_DIR = Path.home() / "Downloads"
-
-
-async def download_file(url: str):
-
-    url = str(url).strip()
-
-    if not url:
-        return {
-            "success": False,
-            "message": "URL не указан."
-        }
-
-    parsed = urlparse(url)
-
-    if parsed.scheme not in ("http", "https"):
-        return {
-            "success": False,
-            "message": "Разрешены только HTTP и HTTPS."
-        }
-
-
-# =====================
-# DOWNLOAD_DIR
-# =====================
-    DOWNLOAD_DIR.mkdir(
-        parents=True,
-        exist_ok=True
-    )
-
-    filename = Path(
-        parsed.path
-    ).name
-
-    if not filename:
-        filename = "download"
-
-    # Убираем потенциально опасные символы
-    filename = re.sub(
-        r'[<>:"/\\|?*]',
-        "_",
-        filename
-    )
-
-    destination = DOWNLOAD_DIR / filename
-
-    try:
-
-        async with httpx.AsyncClient(
-            timeout=60.0,
-            follow_redirects=True
-        ) as client:
-
-            async with client.stream(
-                "GET",
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0"
-                }
-            ) as response:
-
-                response.raise_for_status()
-
-                content_length = response.headers.get(
-                    "content-length"
+                "message": (
+                    f"Путь не существует: "
+                    f"{path}"
                 )
+            }
 
-                # Ограничение 2 ГБ
-                if content_length:
-
-                    size = int(content_length)
-
-                    if size > 2 * 1024 ** 3:
-                        return {
-                            "success": False,
-                            "message": "Файл слишком большой."
-                        }
-
-                with open(
-                    destination,
-                    "wb"
-                ) as file:
-
-                    downloaded = 0
-
-                    async for chunk in response.aiter_bytes(
-                        1024 * 1024
-                    ):
-
-                        downloaded += len(chunk)
-
-                        if downloaded > 2 * 1024 ** 3:
-
-                            file.close()
-
-                            destination.unlink(
-                                missing_ok=True
-                            )
-
-                            return {
-                                "success": False,
-                                "message": (
-                                    "Загрузка остановлена: "
-                                    "файл больше 2 ГБ."
-                                )
-                            }
-
-                        file.write(chunk)
+        os.startfile(path)
 
         return {
             "success": True,
-            "path": str(destination),
-            "size_mb": round(
-                downloaded / 1024 ** 2,
-                2
-            ),
+            "path": path,
             "message": (
-                f"Файл скачан в Downloads: "
-                f"{filename}"
+                f"Открыта папка: {path}"
             )
         }
 
     except Exception as e:
 
-        destination.unlink(
-            missing_ok=True
-        )
-
         return {
             "success": False,
-            "message": f"Ошибка загрузки: {e}"
+            "message": str(e)
         }
 
 
@@ -1358,7 +976,10 @@ async def download_file(url: str):
 
 def get_downloads():
 
-    downloads = Path.home() / "Downloads"
+    downloads = (
+        Path.home()
+        / "Downloads"
+    )
 
     if not downloads.exists():
 
@@ -1399,7 +1020,7 @@ def get_downloads():
 
 
 # ============================================================
-# ПОИСК ФАЙЛА
+# FIND FILE
 # ============================================================
 
 def find_file(filename: str):
@@ -1407,15 +1028,19 @@ def find_file(filename: str):
     filename = str(filename).lower().strip()
 
     if not filename:
+
         return {
             "success": False,
             "message": "Имя файла не указано."
         }
 
     search_locations = [
+
         Path.home() / "Downloads",
+
         Path.home() / "Desktop",
-        Path.home() / "Documents"
+
+        Path.home() / "Documents",
     ]
 
     results = []
@@ -1431,7 +1056,9 @@ def find_file(filename: str):
 
                 if filename in path.name.lower():
 
-                    results.append(str(path))
+                    results.append(
+                        str(path)
+                    )
 
                     if len(results) >= 30:
 
@@ -1453,281 +1080,273 @@ def find_file(filename: str):
 
 
 # ============================================================
-# ОТКРЫТЬ ПАПКУ
+# DOWNLOAD FILE
 # ============================================================
 
-def open_folder(path: str):
+DOWNLOAD_DIR = (
+    Path.home()
+    / "Downloads"
+)
 
-    path = os.path.expandvars(path)
-    path = os.path.expanduser(path)
+MAX_DOWNLOAD_SIZE = 2 * 1024 ** 3
 
-    if not path:
+
+async def download_file(url: str):
+
+    url = str(url).strip()
+
+    if not url:
+
         return {
             "success": False,
-            "message": "Путь не указан."
+            "message": "URL не указан."
         }
+
+    parsed = urlparse(url)
+
+    if parsed.scheme not in (
+        "http",
+        "https"
+    ):
+
+        return {
+            "success": False,
+            "message": (
+                "Разрешены только "
+                "HTTP и HTTPS."
+            )
+        }
+
+    DOWNLOAD_DIR.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    filename = Path(
+        parsed.path
+    ).name
+
+    if not filename:
+
+        filename = "download"
+
+    filename = re.sub(
+        r'[<>:"/\\|?*]',
+        "_",
+        filename
+    )
+
+    destination = (
+        DOWNLOAD_DIR
+        / filename
+    )
 
     try:
 
-        if not os.path.exists(path):
+        async with httpx.AsyncClient(
+            timeout=60.0,
+            follow_redirects=True
+        ) as client:
 
-            return {
-                "success": False,
-                "message": (
-                    f"Путь не существует: {path}"
+            async with client.stream(
+                "GET",
+                url,
+                headers={
+                    "User-Agent":
+                        "Mozilla/5.0"
+                }
+            ) as response:
+
+                response.raise_for_status()
+
+                content_length = (
+                    response.headers.get(
+                        "content-length"
+                    )
                 )
-            }
 
-        os.startfile(path)
+                if content_length:
+
+                    try:
+                        size = int(
+                            content_length
+                        )
+                    except ValueError:
+                        size = 0
+
+                    if size > MAX_DOWNLOAD_SIZE:
+
+                        return {
+                            "success": False,
+                            "message": (
+                                "Файл слишком большой."
+                            )
+                        }
+
+                downloaded = 0
+
+                with open(
+                    destination,
+                    "wb"
+                ) as file:
+
+                    async for chunk in (
+                        response.aiter_bytes(
+                            1024 * 1024
+                        )
+                    ):
+
+                        downloaded += len(
+                            chunk
+                        )
+
+                        if (
+                            downloaded
+                            > MAX_DOWNLOAD_SIZE
+                        ):
+
+                            file.close()
+
+                            destination.unlink(
+                                missing_ok=True
+                            )
+
+                            return {
+                                "success": False,
+                                "message": (
+                                    "Загрузка остановлена: "
+                                    "файл больше 2 ГБ."
+                                )
+                            }
+
+                        file.write(chunk)
 
         return {
             "success": True,
+            "path": str(destination),
+            "size_mb": round(
+                downloaded / 1024 ** 2,
+                2
+            ),
             "message": (
-                f"Открыта папка: {path}"
+                f"Файл скачан в Downloads: "
+                f"{filename}"
             )
         }
 
     except Exception as e:
 
-        return {
-            "success": False,
-            "message": str(e)
-        }
-
-
-# ============================================================
-# WINDOWS COMMAND
-# ============================================================
-
-def run_windows_command(command: str):
-
-    command = str(command).strip()
-
-    if not command:
-
-        return {
-            "success": False,
-            "message": "Команда пустая."
-        }
-
-    # ВАЖНО:
-    # Этот инструмент позволяет выполнять произвольные
-    # команды Windows. Не передавайте сюда команды,
-    # которые могут удалить/повредить данные.
-
-    try:
-
-        result = subprocess.run(
-            command,
-            shell=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30
+        destination.unlink(
+            missing_ok=True
         )
 
         return {
-            "success": result.returncode == 0,
-            "returncode": result.returncode,
-            "stdout": result.stdout[:5000],
-            "stderr": result.stderr[:5000]
-        }
-
-    except subprocess.TimeoutExpired:
-
-        return {
             "success": False,
             "message": (
-                "Команда выполнялась слишком долго."
+                f"Ошибка загрузки: {e}"
             )
         }
-
-    except Exception as e:
-
-        return {
-            "success": False,
-            "message": str(e)
-        }
-
-
-# ============================================================
-# TOOL DEFINITIONS
-# ============================================================
-TOOLS=[
-{
-    "type": "function",
-
-    "function": {
-
-        "name": "open_requested",
-
-        "description": (
-            "Универсальный инструмент открытия объектов. "
-            "Используй его, когда пользователь просит открыть, "
-            "запустить или включить приложение, сайт, файл, "
-            "папку или YouTube."
-        ),
-
-        "parameters": {
-
-            "type": "object",
-
-            "properties": {
-
-                "target": {
-                    "type": "string",
-                    "description": (
-                        "Название или путь объекта, "
-                        "который нужно открыть."
-                    )
-                },
-
-                "target_type": {
-                    "type": "string",
-                    "enum": [
-                        "auto",
-                        "application",
-                        "website",
-                        "youtube",
-                        "movie",
-                        "file",
-                        "folder"
-                    ],
-                    "description": (
-                        "Тип объекта. "
-                        "Используй auto, если тип можно определить автоматически."
-                    )
-                }
-
-            },
-
-            "required": [
-                "target",
-                "target_type"
-            ]
-        }
-    }
-},
-{
-    "type": "function",
-
-    "function": {
-
-        "name": "download_file",
-
-        "description": (
-            "Скачать файл по прямой HTTP или HTTPS ссылке "
-            "в папку Downloads. Не запускать скачанный файл."
-        ),
-
-        "parameters": {
-
-            "type": "object",
-
-            "properties": {
-
-                "url": {
-                    "type": "string",
-                    "description": (
-                        "Прямая HTTP или HTTPS ссылка на файл."
-                    )
-                }
-
-            },
-
-            "required": [
-                "url"
-            ]
-        }
-    }
-}
-    ]
-
 
 
 # ============================================================
 # UNIVERSAL OPEN
 # ============================================================
 
-def open_requested(target: str, target_type: str = "auto"):
+def open_requested(
+    target: str,
+    target_type: str = "auto"
+):
 
     target = str(target).strip()
-    target_type = str(target_type).lower().strip()
+    target_type = str(
+        target_type
+    ).lower().strip()
 
     if not target:
+
         return {
             "success": False,
-            "message": "Не указано, что нужно открыть."
+            "message": (
+                "Не указано, "
+                "что нужно открыть."
+            )
         }
+
+    # --------------------------------------------------------
+    # MOVIE
+    # --------------------------------------------------------
+
     if target_type == "movie":
-        return search_yandex_movie(target)
 
-    # ========================================================
-    # APPLICATION
-    # ========================================================
-
-    if target_type == "application":
-
-        return open_application(target)
-
-    # ========================================================
-    # WEBSITE
-    # ========================================================
-
-    if target_type == "website":
-
-        websites = {
-            "youtube": "https://www.youtube.com",
-            "ютуб": "https://www.youtube.com",
-
-            "google": "https://www.google.com",
-            "гугл": "https://www.google.com",
-
-            "yandex": "https://yandex.ru",
-            "яндекс": "https://yandex.ru",
-
-            "vk": "https://vk.com",
-            "вк": "https://vk.com",
-
-            "telegram": "https://web.telegram.org",
-            "телеграм": "https://web.telegram.org",
-        }
-
-        url = websites.get(
-            target.lower(),
+        return search_yandex_movie(
             target
         )
 
-        return open_website(url)
+    # --------------------------------------------------------
+    # APPLICATION
+    # --------------------------------------------------------
 
-    # ========================================================
+    if target_type == "application":
+
+        if target.lower() in (
+            "steam",
+            "стим"
+        ):
+
+            return open_steam()
+
+        return open_application(
+            target
+        )
+
+    # --------------------------------------------------------
+    # WEBSITE
+    # --------------------------------------------------------
+
+    if target_type == "website":
+
+        return open_website(
+            target
+        )
+
+    # --------------------------------------------------------
     # YOUTUBE
-    # ========================================================
+    # --------------------------------------------------------
 
     if target_type == "youtube":
 
-        return play_youtube(target)
+        return play_youtube(
+            target
+        )
 
-    # ========================================================
+    # --------------------------------------------------------
     # FILE
-    # ========================================================
+    # --------------------------------------------------------
 
     if target_type == "file":
 
-        result = find_file(target)
+        result = find_file(
+            target
+        )
 
-        if not result.get("success"):
+        if not result.get(
+            "success"
+        ):
+
             return result
 
-        files = result.get("results", [])
+        files = result.get(
+            "results",
+            []
+        )
 
         if not files:
 
             return {
                 "success": False,
                 "message": (
-                    f"Файл '{target}' не найден."
+                    f"Файл '{target}' "
+                    f"не найден."
                 )
             }
 
@@ -1735,7 +1354,9 @@ def open_requested(target: str, target_type: str = "auto"):
 
         try:
 
-            os.startfile(file_path)
+            os.startfile(
+                file_path
+            )
 
             return {
                 "success": True,
@@ -1750,142 +1371,66 @@ def open_requested(target: str, target_type: str = "auto"):
             return {
                 "success": False,
                 "message": (
-                    f"Не удалось открыть файл: {e}"
+                    f"Не удалось открыть "
+                    f"файл: {e}"
                 )
             }
 
-    # ========================================================
+    # --------------------------------------------------------
     # FOLDER
-    # ========================================================
+    # --------------------------------------------------------
 
     if target_type == "folder":
 
-        folders = {
-
-            "downloads":
-                Path.home() / "Downloads",
-
-            "загрузки":
-                Path.home() / "Downloads",
-
-            "desktop":
-                Path.home() / "Desktop",
-
-            "рабочий стол":
-                Path.home() / "Desktop",
-
-            "documents":
-                Path.home() / "Documents",
-
-            "документы":
-                Path.home() / "Documents",
-
-        }
-
-        folder = folders.get(
-            target.lower()
+        return open_folder(
+            target
         )
 
-        if folder:
-
-            return open_folder(
-                str(folder)
-            )
-
-        return open_folder(target)
-
-    # ========================================================
+    # --------------------------------------------------------
     # AUTO
-    # ========================================================
+    # --------------------------------------------------------
 
     if target_type == "auto":
 
         lower = target.lower().strip()
 
-        # ----------------------------------------------------
-        # Папки
-        # ----------------------------------------------------
+        # Steam
+        if lower in (
+            "steam",
+            "стим"
+        ):
 
-        folders = {
+            return open_steam()
 
-            "downloads":
-                Path.home() / "Downloads",
-
-            "загрузки":
-                Path.home() / "Downloads",
-
-            "desktop":
-                Path.home() / "Desktop",
-
-            "рабочий стол":
-                Path.home() / "Desktop",
-
-            "documents":
-                Path.home() / "Documents",
-
-            "документы":
-                Path.home() / "Documents",
-
-        }
-
-        if lower in folders:
+        # Folders
+        if lower in KNOWN_FOLDERS:
 
             return open_folder(
-                str(folders[lower])
+                str(
+                    KNOWN_FOLDERS[lower]
+                )
             )
 
-        # ----------------------------------------------------
-        # Сайты
-        # ----------------------------------------------------
-
-        websites = {
-
-            "youtube":
-                "https://www.youtube.com",
-
-            "ютуб":
-                "https://www.youtube.com",
-
-            "google":
-                "https://www.google.com",
-
-            "гугл":
-                "https://www.google.com",
-
-            "yandex":
-                "https://yandex.ru",
-
-            "яндекс":
-                "https://yandex.ru",
-
-            "vk":
-                "https://vk.com",
-
-            "вк":
-                "https://vk.com",
-
-            "telegram":
-                "https://web.telegram.org",
-
-        }
-
-        if lower in websites:
+        # Known websites
+        if lower in KNOWN_WEBSITES:
 
             return open_website(
-                websites[lower]
+                KNOWN_WEBSITES[lower]
             )
 
-        # ----------------------------------------------------
-        # Музыка / видео
-        # ----------------------------------------------------
-
+        # YouTube commands
         youtube_prefixes = [
 
             "включи музыку ",
+
             "включи песню ",
+
             "включи видео ",
+
             "включи ролик ",
+
             "найди на youtube ",
+
             "найди на ютуб ",
 
         ]
@@ -1898,17 +1443,31 @@ def open_requested(target: str, target_type: str = "auto"):
                     len(prefix):
                 ].strip()
 
-                return play_youtube(
-                    query
-                )
+                if query:
 
-        # ----------------------------------------------------
-        # Файл
-        # ----------------------------------------------------
+                    return play_youtube(
+                        query
+                    )
 
-        file_result = find_file(target)
+        # Try application
+        application = find_application(
+            target
+        )
 
-        if file_result.get("success"):
+        if application:
+
+            return open_application(
+                target
+            )
+
+        # Try file
+        file_result = find_file(
+            target
+        )
+
+        if file_result.get(
+            "success"
+        ):
 
             files = file_result.get(
                 "results",
@@ -1934,17 +1493,13 @@ def open_requested(target: str, target_type: str = "auto"):
                 except Exception:
                     pass
 
-        # ----------------------------------------------------
-        # В последнюю очередь приложение
-        # ----------------------------------------------------
-
-        return open_application(
-            target
-        )
-
-    # ========================================================
-    # UNKNOWN TYPE
-    # ========================================================
+        return {
+            "success": False,
+            "message": (
+                f"Не удалось определить, "
+                f"что открыть: '{target}'."
+            )
+        }
 
     return {
         "success": False,
@@ -1954,84 +1509,325 @@ def open_requested(target: str, target_type: str = "auto"):
         )
     }
 
+
 # ============================================================
-# ВЫПОЛНЕНИЕ TOOL
+# TOOL DEFINITIONS
 # ============================================================
-async def execute_tool(name: str, arguments: dict):
+
+TOOLS = [
+
+    {
+        "type": "function",
+
+        "function": {
+
+            "name": "get_pc_info",
+
+            "description": (
+                "Получить информацию "
+                "о компьютере пользователя."
+            ),
+
+            "parameters": {
+
+                "type": "object",
+
+                "properties": {},
+
+                "required": []
+            }
+        }
+    },
+
+    {
+        "type": "function",
+
+        "function": {
+
+            "name": "get_applications",
+
+            "description": (
+                "Получить список приложений, "
+                "найденных на компьютере."
+            ),
+
+            "parameters": {
+
+                "type": "object",
+
+                "properties": {},
+
+                "required": []
+            }
+        }
+    },
+
+    {
+        "type": "function",
+
+        "function": {
+
+            "name": "open_requested",
+
+            "description": (
+                "Главный универсальный инструмент "
+                "для открытия или запуска объекта. "
+                "Используй для приложений, Steam, "
+                "сайтов, YouTube, фильмов, файлов "
+                "и папок."
+            ),
+
+            "parameters": {
+
+                "type": "object",
+
+                "properties": {
+
+                    "target": {
+                        "type": "string",
+                        "description": (
+                            "Название или путь "
+                            "объекта."
+                        )
+                    },
+
+                    "target_type": {
+                        "type": "string",
+
+                        "enum": [
+                            "auto",
+                            "application",
+                            "website",
+                            "youtube",
+                            "movie",
+                            "file",
+                            "folder"
+                        ],
+
+                        "description": (
+                            "Тип объекта. "
+                            "Используй auto, "
+                            "если тип очевиден "
+                            "из запроса."
+                        )
+                    }
+                },
+
+                "required": [
+                    "target",
+                    "target_type"
+                ]
+            }
+        }
+    },
+
+    {
+        "type": "function",
+
+        "function": {
+
+            "name": "search_yandex",
+
+            "description": (
+                "Открыть поиск Яндекс "
+                "по заданному запросу."
+            ),
+
+            "parameters": {
+
+                "type": "object",
+
+                "properties": {
+
+                    "query": {
+                        "type": "string"
+                    }
+                },
+
+                "required": [
+                    "query"
+                ]
+            }
+        }
+    },
+
+    {
+        "type": "function",
+
+        "function": {
+
+            "name": "get_downloads",
+
+            "description": (
+                "Получить список файлов "
+                "и папок в Downloads."
+            ),
+
+            "parameters": {
+
+                "type": "object",
+
+                "properties": {},
+
+                "required": []
+            }
+        }
+    },
+
+    {
+        "type": "function",
+
+        "function": {
+
+            "name": "find_file",
+
+            "description": (
+                "Найти файл в Downloads, "
+                "Desktop или Documents."
+            ),
+
+            "parameters": {
+
+                "type": "object",
+
+                "properties": {
+
+                    "filename": {
+                        "type": "string",
+                        "description": (
+                            "Имя или часть имени файла."
+                        )
+                    }
+                },
+
+                "required": [
+                    "filename"
+                ]
+            }
+        }
+    },
+
+    {
+        "type": "function",
+
+        "function": {
+
+            "name": "download_file",
+
+            "description": (
+                "Скачать файл по прямой "
+                "HTTP или HTTPS ссылке "
+                "в Downloads. "
+                "Не запускать скачанный файл."
+            ),
+
+            "parameters": {
+
+                "type": "object",
+
+                "properties": {
+
+                    "url": {
+                        "type": "string",
+                        "description": (
+                            "HTTP или HTTPS URL."
+                        )
+                    }
+                },
+
+                "required": [
+                    "url"
+                ]
+            }
+        }
+    }
+]
+
+
+# ============================================================
+# EXECUTE TOOL
+# ============================================================
+
+async def execute_tool(
+    name: str,
+    arguments: dict
+):
 
     try:
 
         if name == "get_pc_info":
+
             return get_pc_info()
 
-        elif name == "open_application":
-            return open_application(
-                arguments.get("application", "")
+        if name == "get_applications":
+
+            return get_applications()
+
+        if name == "open_requested":
+
+            return open_requested(
+                arguments.get(
+                    "target",
+                    ""
+                ),
+                arguments.get(
+                    "target_type",
+                    "auto"
+                )
             )
 
-        elif name == "open_website":
-            return open_website(
-                arguments.get("url", "")
-            )
+        if name == "search_yandex":
 
-        elif name == "search_yandex":
             return search_yandex(
-                arguments.get("query", "")
+                arguments.get(
+                    "query",
+                    ""
+                )
             )
 
-        elif name == "play_youtube":
-            return play_youtube(
-                arguments.get("query", "")
-            )
+        if name == "get_downloads":
 
-        elif name == "search_yandex_movie":
-            return search_yandex_movie(
-                arguments.get("query", "")
-            )
-
-        elif name == "get_downloads":
             return get_downloads()
 
-        elif name == "find_file":
+        if name == "find_file":
+
             return find_file(
-                arguments.get("filename", "")
+                arguments.get(
+                    "filename",
+                    ""
+                )
             )
 
-        elif name == "open_folder":
-            return open_folder(
-                arguments.get("path", "")
-            )
+        if name == "download_file":
 
-        elif name == "run_windows_command":
-            return run_windows_command(
-                arguments.get("command", "")
-            )
-
-        elif name == "open_requested":
-            return open_requested(
-                arguments.get("target", ""),
-                arguments.get("target_type", "auto")
-            )
-
-        elif name == "download_file":
             return await download_file(
-                arguments.get("url", "")
+                arguments.get(
+                    "url",
+                    ""
+                )
             )
 
-        else:
-            return {
-                "success": False,
-                "message": f"Неизвестный инструмент: {name}"
-            }
+        return {
+            "success": False,
+            "message": (
+                f"Неизвестный инструмент: "
+                f"{name}"
+            )
+        }
 
     except Exception as e:
 
         return {
             "success": False,
             "message": (
-                f"Ошибка инструмента {name}: {e}"
+                f"Ошибка инструмента "
+                f"{name}: {e}"
             )
         }
+
+
+# ============================================================
+# GROQ
 # ============================================================
 
 async def ask_groq(text: str):
@@ -2040,140 +1836,127 @@ async def ask_groq(text: str):
 
         return {
             "answer": (
-                "Ошибка: GROQ_API_KEY не найден. "
-                "Проверь файл .env."
+                "Ошибка: GROQ_API_KEY "
+                "не найден в .env."
             ),
             "action": "none",
             "query": ""
         }
 
     system_message = """
-Ты Jarvis — умный локальный помощник пользователя.
+Ты Jarvis — локальный AI-помощник пользователя.
 
-Ты можешь:
+Отвечай только на русском языке.
+
+Ты умеешь:
 
 - отвечать на обычные вопросы;
 - получать информацию о компьютере;
-- запускать разрешённые приложения;
+- запускать приложения;
+- запускать Steam;
 - открывать сайты;
 - искать через Яндекс;
-- смотреть Downloads;
-- искать файлы;
+- искать и открывать файлы;
 - открывать папки;
-- выполнять безопасные команды Windows.
+- смотреть Downloads;
+- открывать YouTube;
+- искать видео и музыку на YouTube;
+- искать фильмы через Яндекс;
+- скачивать файлы по HTTP/HTTPS.
 
-ВАЖНЫЕ ПРАВИЛА:
+ПРАВИЛА:
 
-1. Если для выполнения просьбы нужен инструмент —
-   используй соответствующий инструмент.
+1. Если для выполнения запроса нужен инструмент —
+   обязательно используй инструмент.
 
 2. Не говори, что действие выполнено,
-   пока инструмент действительно не вернул результат.
+   пока инструмент не вернул результат.
 
-3. Не выдумывай информацию о компьютере.
+3. Если инструмент вернул success=true,
+   сообщи пользователю реальный результат.
 
-4. Если пользователь спрашивает характеристики ПК —
-   используй get_pc_info.
-   
-5. Если пользователь просит открыть или запустить
-приложение — используй open_application.
+4. Если инструмент вернул success=false,
+   не утверждай, что действие выполнено.
 
-6. Разрешено запускать любое приложение,
-установленное на компьютере пользователя.
+5. Не выдумывай характеристики компьютера.
+   Для информации о ПК используй get_pc_info.
 
-7. Не говори, что приложение запущено,
-пока open_application не вернул success=true.
+6. Если пользователь просит открыть, запустить
+   или включить приложение, используй open_requested.
 
-8. Если пользователь спрашивает про Downloads —
-   используй get_downloads.
+7. Для приложения используй:
+   target_type="application"
 
-9. Если пользователь просит найти файл —
-   используй find_file.
+8. Для сайта:
+   target_type="website"
 
-10. Если пользователь просит открыть папку —
-    используй open_folder.
+9. Для YouTube, песни, музыки или видео:
+   target_type="youtube"
 
-11. Отвечай на русском языке.
+10. Для фильма, сериала или мультфильма через Яндекс:
+    target_type="movie"
 
-12. Будь кратким, но полезным.
+11. Для файла:
+    target_type="file"
 
-13. Не выполняй опасные команды,
-    связанные с удалением файлов, форматированием,
-    отключением защиты Windows или повреждением системы.
-    
-14. Если пользователь просит найти видео, музыку,
-фильм, сериал или мультфильм на YouTube —
-используй play_youtube.
+12. Для папки:
+    target_type="folder"
 
-15. Если пользователь просит найти фильм,
-сериал или мультфильм через Яндекс —
-используй search_yandex_movie.
+13. Если пользователь говорит просто
+    "открой X", используй open_requested
+    с максимально подходящим типом.
 
-16. Если пользователь говорит:
-"включи музыку", "включи видео", "включи ролик",
-"посмотри фильм" и явно указывает название —
-не задавай лишних вопросов, а используй
-соответствующий инструмент.
+14. Steam является разрешённым приложением.
+    Для "открой Steam", "запусти Steam",
+    "включи Steam", "открой Стим"
+    используй open_requested:
+    target="steam"
+    target_type="application"
 
-17. После выполнения инструмента сообщай только
-то, что реально произошло.
+15. Не используй отдельные команды Windows
+    для запуска Steam.
 
-18. Не говори "видео запущено", если инструмент
-только открыл страницу поиска.
-19. Steam является разрешённым приложением.
+16. Если пользователь просит включить музыку,
+    песню, видео или ролик и указывает название,
+    используй YouTube.
 
-20. Если пользователь просит:
-"открой Steam",
-"запусти Steam",
-"включи Steam",
-"открой стим",
-"запусти стим",
-используй open_application с:
-application="steam".
+17. Если пользователь просит найти фильм,
+    сериал или мультфильм через Яндекс,
+    используй target_type="movie".
 
-21. Не используй run_windows_command для запуска Steam,
-если можно использовать open_application.
+18. Если пользователь спрашивает содержимое Downloads,
+    используй get_downloads.
 
-22. Если пользователь просит открыть, запустить или включить
-что-либо, используй open_requested.
+19. Если пользователь просит найти файл,
+    используй find_file.
 
-23. open_requested является главным универсальным инструментом
-для открытия объектов.
+20. Если пользователь просит открыть папку,
+    используй open_requested.
 
-24. Для приложения используй:
-target_type="application"
+21. Не выполняй опасные системные операции.
 
-25. Для сайта используй:
-target_type="website"
+22. Не удаляй файлы.
 
-26. Для YouTube, музыки, видео или песни используй:
-target_type="youtube"
+23. Не форматируй диски.
 
-27. Для файла используй:
-target_type="file"
+24. Не отключай антивирус или защиту Windows.
 
-28. Для папки используй:
-target_type="folder"
+25. Не используй shell-команды для опасных действий.
 
-29. Если тип объекта очевиден, не задавай уточняющих вопросов.
+26. После инструмента отвечай кратко.
 
-30. Если пользователь говорит "открой X", используй
-open_requested с target="X" и максимально подходящим
-target_type.
+27. Если инструмент только открыл страницу поиска,
+    не говори "видео запущено".
+    Говори, что открыт поиск.
 
-31. После выполнения инструмента сообщай только результат
-инструмента.
+28. Если open_requested успешно запустил приложение,
+    сообщи, что приложение запущено.
 
-32. Если success=true, сообщай, что объект действительно
-открыт или запущен.
+29. Если open_requested успешно открыл папку,
+    сообщи, что папка открыта.
 
-33. Если success= false, не утверждай, что объект был открыт.
-
-31. После выполнения инструмента сообщай только результат инструмента.
-
-32. Если инструмент вернул success = true, сообщай, что объект открыт или запущен.
-
-33. Если инструмент вернул success = false,не говори, что объект был открыт.
+30. Не задавай лишних уточняющих вопросов,
+    если из команды пользователя всё понятно.
 """
 
     messages = [
@@ -2183,36 +1966,39 @@ target_type.
         }
     ]
 
-    # Добавляем историю
     messages.extend(
         conversation_history
     )
 
-    # Добавляем текущий запрос
     messages.append({
         "role": "user",
         "content": text
     })
 
     headers = {
-        "Authorization": (
-            f"Bearer {GROQ_API_KEY}"
-        ),
-        "Content-Type": "application/json"
+        "Authorization":
+            f"Bearer {GROQ_API_KEY}",
+
+        "Content-Type":
+            "application/json"
     }
 
     data = {
         "model": GROQ_MODEL,
+
         "messages": messages,
+
         "tools": TOOLS,
+
         "tool_choice": "auto",
+
         "temperature": 0.2
     }
 
     try:
 
         # ====================================================
-        # ПЕРВЫЙ ЗАПРОС
+        # FIRST REQUEST
         # ====================================================
 
         async with httpx.AsyncClient(
@@ -2231,31 +2017,6 @@ target_type.
         )
 
         if response.status_code != 200:
-            print("Статус Groq:", response.status_code)
-            print("Ответ Groq:")
-            print(response.text)
-
-            return {
-                "answer": (
-                    f"Ошибка Groq: {response.status_code}"
-                ),
-                "action": "none",
-                "query": ""
-            }
-
-        # ====================================================
-        # JSON
-        # ====================================================
-
-        try:
-
-            result = response.json()
-
-        except json.JSONDecodeError:
-
-            print(
-                "Groq вернул не JSON:"
-            )
 
             print(
                 response.text
@@ -2263,15 +2024,27 @@ target_type.
 
             return {
                 "answer": (
-                    "Groq вернул некорректный ответ."
+                    f"Ошибка Groq: "
+                    f"{response.status_code}"
                 ),
                 "action": "none",
                 "query": ""
             }
 
-        # ====================================================
-        # ПРОВЕРКА CHOICES
-        # ====================================================
+        try:
+
+            result = response.json()
+
+        except json.JSONDecodeError:
+
+            return {
+                "answer": (
+                    "Groq вернул "
+                    "некорректный JSON."
+                ),
+                "action": "none",
+                "query": ""
+            }
 
         choices = result.get(
             "choices",
@@ -2280,15 +2053,9 @@ target_type.
 
         if not choices:
 
-            print(
-                "В ответе Groq нет choices:"
-            )
-
-            print(result)
-
             return {
                 "answer": (
-                    "Groq не вернул сообщение."
+                    "Groq не вернул ответ."
                 ),
                 "action": "none",
                 "query": ""
@@ -2301,23 +2068,14 @@ target_type.
 
         if not message:
 
-            print(
-                "В ответе Groq нет message:"
-            )
-
-            print(result)
-
             return {
                 "answer": (
-                    "Groq не вернул корректное сообщение."
+                    "Groq не вернул "
+                    "корректное сообщение."
                 ),
                 "action": "none",
                 "query": ""
             }
-
-        # ====================================================
-        # TOOL CALLS
-        # ====================================================
 
         tool_calls = message.get(
             "tool_calls",
@@ -2325,12 +2083,13 @@ target_type.
         )
 
         # ====================================================
-        # ЕСЛИ НУЖЕН TOOL
+        # TOOL CALL
         # ====================================================
 
         if tool_calls:
 
-            # Обязательно добавляем assistant message
+            # IMPORTANT:
+            # сохраняем assistant message
             messages.append(message)
 
             for tool_call in tool_calls:
@@ -2358,25 +2117,17 @@ target_type.
 
                 except json.JSONDecodeError:
 
-                    print(
-                        "Некорректные arguments:"
-                    )
-
-                    print(
-                        arguments_text
-                    )
-
                     arguments = {}
 
+                print()
                 print(
                     "Jarvis вызывает:",
-                    name,
+                    name
+                )
+                print(
+                    "Аргументы:",
                     arguments
                 )
-
-                # --------------------------------------------
-                # Выполнение инструмента
-                # --------------------------------------------
 
                 tool_result = await execute_tool(
                     name,
@@ -2388,43 +2139,58 @@ target_type.
                     tool_result
                 )
 
-                # --------------------------------------------
-                # Возвращаем результат Groq
-                # --------------------------------------------
-
                 messages.append({
+
                     "role": "tool",
-                    "tool_call_id": tool_call.get(
-                        "id",
-                        ""
-                    ),
-                    "name": name,
-                    "content": json.dumps(
-                        tool_result,
-                        ensure_ascii=False
-                    )
+
+                    "tool_call_id":
+                        tool_call.get(
+                            "id",
+                            ""
+                        ),
+
+                    "name":
+                        name,
+
+                    "content":
+                        json.dumps(
+                            tool_result,
+                            ensure_ascii=False
+                        )
                 })
 
             # =================================================
-            # ВТОРОЙ ЗАПРОС GROQ
+            # SECOND GROQ REQUEST
             # =================================================
 
             second_data = {
-                "model": GROQ_MODEL,
-                "messages": messages,
-                "tools": TOOLS,
-                "tool_choice": "auto",
-                "temperature": 0.2
+
+                "model":
+                    GROQ_MODEL,
+
+                "messages":
+                    messages,
+
+                "tools":
+                    TOOLS,
+
+                "tool_choice":
+                    "none",
+
+                "temperature":
+                    0.2
             }
 
             async with httpx.AsyncClient(
                 timeout=60.0
             ) as client:
 
-                second_response = await client.post(
-                    GROQ_URL,
-                    headers=headers,
-                    json=second_data
+                second_response = (
+                    await client.post(
+                        GROQ_URL,
+                        headers=headers,
+                        json=second_data
+                    )
                 )
 
             print(
@@ -2435,23 +2201,18 @@ target_type.
             if second_response.status_code != 200:
 
                 print(
-                    "Ответ второго Groq:",
                     second_response.text
                 )
 
                 return {
                     "answer": (
-                        "Ошибка Groq после "
-                        "выполнения инструмента: "
-                        f"{second_response.status_code}"
+                        "Инструмент выполнен, "
+                        "но Groq не смог сформировать "
+                        "финальный ответ."
                     ),
                     "action": "none",
                     "query": ""
                 }
-
-            # ----------------------------------------------
-            # JSON второго ответа
-            # ----------------------------------------------
 
             try:
 
@@ -2463,8 +2224,9 @@ target_type.
 
                 return {
                     "answer": (
-                        "Groq вернул "
-                        "некорректный второй ответ."
+                        "Инструмент выполнен, "
+                        "но Groq вернул "
+                        "некорректный ответ."
                     ),
                     "action": "none",
                     "query": ""
@@ -2477,55 +2239,59 @@ target_type.
                 )
             )
 
-            if not second_choices:
+            if second_choices:
 
-                print(
-                    "Второй ответ без choices:"
+                second_message = (
+                    second_choices[0]
+                    .get(
+                        "message",
+                        {}
+                    )
                 )
 
-                print(
-                    second_result
+                answer = (
+                    second_message.get(
+                        "content"
+                    )
+                    or "Команда выполнена."
                 )
+
+            else:
 
                 answer = (
                     "Команда выполнена."
                 )
 
-            else:
-
-                second_message = (
-                    second_choices[0]
-                    .get("message", {})
-                )
-
-                answer = (
-                    second_message
-                    .get("content")
-                    or "Команда выполнена."
-                )
-
         # ====================================================
-        # ОБЫЧНЫЙ ОТВЕТ БЕЗ TOOL
+        # NORMAL RESPONSE
         # ====================================================
 
         else:
 
             answer = (
-                message.get("content")
+                message.get(
+                    "content"
+                )
                 or "Не удалось получить ответ."
             )
 
+        answer = answer.strip()
+
         # ====================================================
-        # ПАМЯТЬ
+        # MEMORY
         # ====================================================
 
         conversation_history.append({
+
             "role": "user",
+
             "content": text
         })
 
         conversation_history.append({
+
             "role": "assistant",
+
             "content": answer
         })
 
@@ -2535,19 +2301,14 @@ target_type.
 
             conversation_history.pop(0)
 
-        # ====================================================
-        # RETURN
-        # ====================================================
-
         return {
-            "answer": answer.strip(),
+
+            "answer": answer,
+
             "action": "none",
+
             "query": ""
         }
-
-    # ========================================================
-    # HTTP ERROR
-    # ========================================================
 
     except httpx.HTTPError as e:
 
@@ -2557,16 +2318,16 @@ target_type.
         )
 
         return {
-            "answer": (
-                "Не удалось подключиться к Groq."
-            ),
-            "action": "none",
-            "query": ""
-        }
 
-    # ========================================================
-    # OTHER ERROR
-    # ========================================================
+            "answer":
+                "Не удалось подключиться к Groq.",
+
+            "action":
+                "none",
+
+            "query":
+                ""
+        }
 
     except Exception as e:
 
@@ -2576,11 +2337,15 @@ target_type.
         )
 
         return {
-            "answer": (
-                f"Произошла ошибка: {e}"
-            ),
-            "action": "none",
-            "query": ""
+
+            "answer":
+                f"Произошла ошибка: {e}",
+
+            "action":
+                "none",
+
+            "query":
+                ""
         }
 
 
@@ -2593,7 +2358,9 @@ async def chat(
     text: str = Form(...)
 ):
 
-    result = await ask_groq(text)
+    result = await ask_groq(
+        text
+    )
 
     return JSONResponse(
         result
@@ -2786,7 +2553,7 @@ button:hover {
 
 <body>
 
-<h1>🤖 My Jarvis</h1>
+<h1>🤖 Jarvis</h1>
 
 <div class="subtitle">
     Локальный AI-помощник
@@ -2844,7 +2611,7 @@ function escapeHtml(text) {
 
 
 // ========================================================
-// ОТПРАВКА
+// SEND MESSAGE
 // ========================================================
 
 async function sendMessage() {
@@ -2940,7 +2707,7 @@ async function sendMessage() {
 
 
 // ========================================================
-// SEND
+// SEND BUTTON
 // ========================================================
 
 document
@@ -3152,4 +2919,3 @@ if __name__ == "__main__":
         host="127.0.0.1",
         port=9013
     )
-
