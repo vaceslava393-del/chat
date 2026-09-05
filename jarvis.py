@@ -12,18 +12,17 @@ from pathlib import Path
 from urllib.parse import quote, urlparse
 
 import httpx
-
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Form
 from fastapi.responses import StreamingResponse, HTMLResponse, JSONResponse
+
 import warnings
 
 warnings.filterwarnings(
     "ignore",
     category=DeprecationWarning
 )
-
 
 
 # ============================================================
@@ -54,7 +53,6 @@ BASE_DIR = Path(__file__).resolve().parent
 
 load_dotenv(BASE_DIR / ".env")
 
-
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 GROQ_MODEL = os.getenv(
@@ -67,25 +65,24 @@ GROQ_URL = os.getenv(
     "https://api.groq.com/openai/v1/chat/completions"
 )
 
-
 MAX_HISTORY = 10
 
 conversation_history = []
 
-
 app = FastAPI(
-    title="My Jarvis"
+    title="JARVIS AI",
+    version="2.0"
 )
 
 
 # ============================================================
-# STARTUP CHECK
+# STARTUP
 # ============================================================
 
 print()
-print("=" * 60)
-print("JARVIS")
-print("=" * 60)
+print("=" * 70)
+print("🤖 JARVIS AI")
+print("=" * 70)
 
 print(
     "Python:",
@@ -102,74 +99,45 @@ print(
     GROQ_MODEL
 )
 
-print(
-    "Groq URL:",
-    GROQ_URL
-)
-
 if GROQ_API_KEY:
-    print(
-        "Groq API key: найден"
-    )
+    print("Groq API key: найден")
 else:
-    print(
-        "WARNING: GROQ_API_KEY не найден в .env"
-    )
+    print("WARNING: GROQ_API_KEY не найден в .env")
 
-print("=" * 60)
+print("=" * 70)
 print()
 
 
 # ============================================================
-# CAMERA GLOBALS
+# CAMERA
 # ============================================================
 
 camera = None
-
 camera_lock = threading.Lock()
 
 
 # ============================================================
-# YOLO MODEL
+# YOLO
 # ============================================================
 
 model = None
 
 
 def load_yolo():
-
     global model
 
     if YOLO is None:
-
-        print(
-            "YOLO: ultralytics не установлен."
-        )
-
+        print("YOLO: ultralytics не установлен.")
         return
 
     try:
-
-        model = YOLO(
-            "yolov8n.pt"
-        )
-
-        print(
-            "YOLO: модель загружена."
-        )
-
+        model = YOLO("yolov8n.pt")
+        print("YOLO: модель загружена.")
     except Exception as e:
-
-        print(
-            "YOLO: модель не загружена:",
-            e
-        )
-
+        print("YOLO: модель не загружена:", e)
         model = None
 
 
-# Загружаем модель.
-# Если yolov8n.pt отсутствует, камера всё равно сможет работать.
 load_yolo()
 
 
@@ -181,16 +149,10 @@ def get_start_menu_locations():
 
     locations = []
 
-    appdata = os.environ.get(
-        "APPDATA"
-    )
-
-    programdata = os.environ.get(
-        "PROGRAMDATA"
-    )
+    appdata = os.environ.get("APPDATA")
+    programdata = os.environ.get("PROGRAMDATA")
 
     if appdata:
-
         locations.append(
             Path(appdata)
             / "Microsoft"
@@ -200,7 +162,6 @@ def get_start_menu_locations():
         )
 
     if programdata:
-
         locations.append(
             Path(programdata)
             / "Microsoft"
@@ -216,27 +177,17 @@ def get_start_menu_locations():
     return locations
 
 
-def normalize_app_name(
-    name: str
-):
+def normalize_app_name(name: str):
 
-    name = str(
-        name
-    ).lower().strip()
+    name = str(name).lower().strip()
 
     for extension in (
         ".lnk",
         ".url",
         ".exe"
     ):
-
-        if name.endswith(
-            extension
-        ):
-
-            name = name[
-                :-len(extension)
-            ]
+        if name.endswith(extension):
+            name = name[:-len(extension)]
 
     return name.strip()
 
@@ -263,21 +214,15 @@ def scan_installed_applications():
                     ".url"
                 ):
 
-                    name = normalize_app_name(
-                        item.stem
-                    )
+                    name = normalize_app_name(item.stem)
 
                     if name:
-
-                        applications[name] = str(
-                            item
-                        )
+                        applications[name] = str(item)
 
         except (
             PermissionError,
             OSError
         ):
-
             continue
 
     return applications
@@ -285,41 +230,25 @@ def scan_installed_applications():
 
 SYSTEM_APPS = {
 
-    "notepad":
-        "notepad.exe",
+    "notepad": "notepad.exe",
+    "блокнот": "notepad.exe",
 
-    "блокнот":
-        "notepad.exe",
+    "calculator": "calc.exe",
+    "калькулятор": "calc.exe",
 
-    "calculator":
-        "calc.exe",
+    "explorer": "explorer.exe",
+    "проводник": "explorer.exe",
 
-    "калькулятор":
-        "calc.exe",
+    "paint": "mspaint.exe",
+    "рисование": "mspaint.exe",
 
-    "explorer":
-        "explorer.exe",
-
-    "проводник":
-        "explorer.exe",
-
-    "paint":
-        "mspaint.exe",
-
-    "рисование":
-        "mspaint.exe",
-
-    "cmd":
-        "cmd.exe",
+    "cmd": "cmd.exe",
 }
 
 
 ALLOWED_APPS = scan_installed_applications()
 
-ALLOWED_APPS.update(
-    SYSTEM_APPS
-)
-
+ALLOWED_APPS.update(SYSTEM_APPS)
 
 print(
     "Найдено приложений:",
@@ -331,32 +260,20 @@ print(
 # FIND APPLICATION
 # ============================================================
 
-def find_application(
-    application: str
-):
+def find_application(application: str):
 
-    application = str(
-        application
-    ).strip()
+    application = str(application).strip()
 
     if not application:
         return None
 
-    name = (
-        application
-        .lower()
-        .strip()
-    )
+    name = application.lower().strip()
 
     if name.endswith(".exe"):
-
         name = name[:-4]
 
-
     if name in SYSTEM_APPS:
-
         return SYSTEM_APPS[name]
-
 
     for app_name, path in ALLOWED_APPS.items():
 
@@ -367,35 +284,25 @@ def find_application(
         )
 
         if clean_name.endswith(".exe"):
-
             clean_name = clean_name[:-4]
 
         if name == clean_name:
-
             return path
-
 
     try:
 
-        found = shutil.which(
-            application
-        )
+        found = shutil.which(application)
 
         if found:
             return found
 
-
-        found = shutil.which(
-            application + ".exe"
-        )
+        found = shutil.which(application + ".exe")
 
         if found:
             return found
 
     except Exception:
-
         pass
-
 
     locations = [
 
@@ -413,40 +320,26 @@ def find_application(
             )
         ),
 
-        Path.home()
-        / "AppData"
-        / "Local",
+        Path.home() / "AppData" / "Local",
 
-        Path.home()
-        / "AppData"
-        / "Roaming",
+        Path.home() / "AppData" / "Roaming",
 
-        Path.home()
-        / "Desktop",
+        Path.home() / "Desktop",
 
         Path(
             os.environ.get(
                 "APPDATA",
                 ""
             )
-        )
-        / "Microsoft"
-        / "Windows"
-        / "Start Menu"
-        / "Programs",
+        ) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
 
         Path(
             os.environ.get(
                 "PROGRAMDATA",
                 ""
             )
-        )
-        / "Microsoft"
-        / "Windows"
-        / "Start Menu"
-        / "Programs",
+        ) / "Microsoft" / "Windows" / "Start Menu" / "Programs",
     ]
-
 
     for location in locations:
 
@@ -458,16 +351,13 @@ def find_application(
             for exe in location.rglob("*.exe"):
 
                 if exe.stem.lower() == name:
-
                     return str(exe)
 
         except (
             PermissionError,
             OSError
         ):
-
             continue
-
 
     return None
 
@@ -476,33 +366,20 @@ def find_application(
 # OPEN APPLICATION
 # ============================================================
 
-def open_application(
-    application: str
-):
+def open_application(application: str):
 
-    application = str(
-        application
-    ).strip()
+    application = str(application).strip()
 
     if not application:
 
         return {
             "success": False,
-            "message":
-                "Название приложения не указано."
+            "message": "Название приложения не указано."
         }
 
+    print("Поиск приложения:", application)
 
-    print(
-        "Поиск приложения:",
-        application
-    )
-
-
-    program = find_application(
-        application
-    )
-
+    program = find_application(application)
 
     if not program:
 
@@ -512,22 +389,17 @@ def open_application(
                 f"Приложение '{application}' не найдено."
         }
 
-
     try:
 
         if str(program).lower().endswith(
             (".lnk", ".url")
         ):
 
-            os.startfile(
-                program
-            )
+            os.startfile(program)
 
         else:
 
-            directory = os.path.dirname(
-                program
-            )
+            directory = os.path.dirname(program)
 
             if directory:
 
@@ -544,31 +416,20 @@ def open_application(
                     shell=False
                 )
 
-
         return {
-
             "success": True,
-
-            "application":
-                application,
-
-            "path":
-                str(program),
-
+            "application": application,
+            "path": str(program),
             "message":
                 f"Приложение '{application}' запущено."
         }
 
-
     except Exception as e:
 
         return {
-
             "success": False,
-
             "message":
-                f"Не удалось запустить "
-                f"'{application}': {e}"
+                f"Не удалось запустить '{application}': {e}"
         }
 
 
@@ -581,22 +442,12 @@ def get_applications():
     global ALLOWED_APPS
 
     ALLOWED_APPS = scan_installed_applications()
-
-    ALLOWED_APPS.update(
-        SYSTEM_APPS
-    )
+    ALLOWED_APPS.update(SYSTEM_APPS)
 
     return {
-
         "success": True,
-
-        "count":
-            len(ALLOWED_APPS),
-
-        "applications":
-            sorted(
-                ALLOWED_APPS.keys()
-            )
+        "count": len(ALLOWED_APPS),
+        "applications": sorted(ALLOWED_APPS.keys())
     }
 
 
@@ -613,18 +464,14 @@ def open_steam():
                 "PROGRAMFILES(X86)",
                 r"C:\Program Files (x86)"
             )
-        )
-        / "Steam"
-        / "steam.exe",
+        ) / "Steam" / "steam.exe",
 
         Path(
             os.environ.get(
                 "PROGRAMFILES",
                 r"C:\Program Files"
             )
-        )
-        / "Steam"
-        / "steam.exe",
+        ) / "Steam" / "steam.exe",
 
         Path.home()
         / "AppData"
@@ -633,42 +480,28 @@ def open_steam():
         / "steam.exe",
     ]
 
-
     steam_path = None
-
 
     for path in possible_paths:
 
         if path.is_file():
 
             steam_path = path
-
             break
-
 
     if steam_path is None:
 
-        found = shutil.which(
-            "steam.exe"
-        )
+        found = shutil.which("steam.exe")
 
         if found:
-
-            steam_path = Path(
-                found
-            )
-
+            steam_path = Path(found)
 
     if steam_path is None:
 
         return {
-
             "success": False,
-
-            "message":
-                "Steam не найден."
+            "message": "Steam не найден."
         }
-
 
     try:
 
@@ -678,26 +511,16 @@ def open_steam():
         )
 
         return {
-
             "success": True,
-
-            "application":
-                "Steam",
-
-            "path":
-                str(steam_path),
-
-            "message":
-                "Steam запущен."
+            "application": "Steam",
+            "path": str(steam_path),
+            "message": "Steam запущен."
         }
-
 
     except Exception as e:
 
         return {
-
             "success": False,
-
             "message":
                 f"Не удалось запустить Steam: {e}"
         }
@@ -720,60 +543,39 @@ def get_pc_info():
             system_drive + "\\"
         )
 
-
         return {
 
             "success": True,
 
-            "system":
-                platform.system(),
+            "system": platform.system(),
 
-            "release":
-                platform.release(),
+            "release": platform.release(),
 
-            "version":
-                platform.version(),
+            "version": platform.version(),
 
-            "machine":
-                platform.machine(),
+            "machine": platform.machine(),
 
-            "processor":
-                platform.processor(),
+            "processor": platform.processor(),
 
-            "computer_name":
-                platform.node(),
+            "computer_name": platform.node(),
 
-            "cpu_count":
-                os.cpu_count(),
+            "cpu_count": os.cpu_count(),
 
             "disk_total_gb":
-                round(
-                    total / 1024 ** 3,
-                    2
-                ),
+                round(total / 1024 ** 3, 2),
 
             "disk_used_gb":
-                round(
-                    used / 1024 ** 3,
-                    2
-                ),
+                round(used / 1024 ** 3, 2),
 
             "disk_free_gb":
-                round(
-                    free / 1024 ** 3,
-                    2
-                )
+                round(free / 1024 ** 3, 2)
         }
-
 
     except Exception as e:
 
         return {
-
             "success": False,
-
-            "error":
-                str(e)
+            "error": str(e)
         }
 
 
@@ -781,24 +583,16 @@ def get_pc_info():
 # YOUTUBE
 # ============================================================
 
-def play_youtube(
-    query: str
-):
+def play_youtube(query: str):
 
-    query = str(
-        query
-    ).strip()
+    query = str(query).strip()
 
     if not query:
 
         return {
-
             "success": False,
-
-            "message":
-                "Название видео не указано."
+            "message": "Название видео не указано."
         }
-
 
     try:
 
@@ -813,20 +607,15 @@ def play_youtube(
             + encoded_query
         )
 
-
         with httpx.Client(
             timeout=15.0,
             follow_redirects=True,
             headers={
-                "User-Agent":
-                    "Mozilla/5.0"
+                "User-Agent": "Mozilla/5.0"
             }
         ) as client:
 
-            response = client.get(
-                search_url
-            )
-
+            response = client.get(search_url)
 
         if response.status_code != 200:
 
@@ -836,37 +625,24 @@ def play_youtube(
             )
 
             return {
-
                 "success": True,
-
-                "query":
-                    query,
-
-                "url":
-                    search_url,
-
+                "query": query,
+                "url": search_url,
                 "message":
                     f"Открываю YouTube: {query}"
             }
-
 
         video_ids = re.findall(
             r'"videoId":"([^"]+)"',
             response.text
         )
 
-
         unique_video_ids = []
-
 
         for video_id in video_ids:
 
             if video_id not in unique_video_ids:
-
-                unique_video_ids.append(
-                    video_id
-                )
-
+                unique_video_ids.append(video_id)
 
         if unique_video_ids:
 
@@ -883,22 +659,13 @@ def play_youtube(
             )
 
             return {
-
                 "success": True,
-
-                "query":
-                    query,
-
-                "video_id":
-                    video_id,
-
-                "url":
-                    video_url,
-
+                "query": query,
+                "video_id": video_id,
+                "url": video_url,
                 "message":
                     f"Открываю видео YouTube: {query}"
             }
-
 
         webbrowser.open(
             search_url,
@@ -906,103 +673,69 @@ def play_youtube(
         )
 
         return {
-
             "success": True,
-
-            "query":
-                query,
-
-            "url":
-                search_url,
-
+            "query": query,
+            "url": search_url,
             "message":
                 f"Открываю поиск YouTube: {query}"
         }
 
-
     except Exception as e:
 
         return {
-
             "success": False,
-
             "message":
                 f"Ошибка YouTube: {e}"
         }
 
 
 # ============================================================
-# YANDEX SEARCH
+# YANDEX
 # ============================================================
 
-def search_yandex(
-    query: str
-):
+def search_yandex(query: str):
 
-    query = str(
-        query
-    ).strip()
+    query = str(query).strip()
 
     if not query:
 
         return {
-
             "success": False,
-
-            "message":
-                "Поисковый запрос пустой."
+            "message": "Поисковый запрос пустой."
         }
-
 
     try:
 
         url = (
             "https://yandex.ru/search/?text="
-            + quote(
-                query,
-                safe=""
-            )
+            + quote(query, safe="")
         )
-
 
         opened = webbrowser.open(
             url,
             new=2
         )
 
-
         if not opened:
 
             return {
-
                 "success": False,
-
                 "message":
                     "Не удалось открыть браузер."
             }
 
-
         return {
-
             "success": True,
-
-            "query":
-                query,
-
-            "url":
-                url,
-
+            "query": query,
+            "url": url,
             "message":
                 f"Открываю поиск Яндекс: {query}"
         }
 
-
     except Exception as e:
 
         return {
-
             "success": False,
-
             "message":
                 f"Ошибка Яндекса: {e}"
         }
@@ -1012,28 +745,55 @@ def search_yandex(
 # MOVIE SEARCH
 # ============================================================
 
-def search_yandex_movie(
-    query: str
-):
+def search_yandex_movie(query: str):
 
-    query = str(
-        query
-    ).strip()
+    query = str(query).strip()
 
     if not query:
 
         return {
-
             "success": False,
-
-            "message":
-                "Название фильма не указано."
+            "message": "Название фильма не указано."
         }
 
+    try:
 
-    return search_yandex(
-        f"{query} фильм"
-    )
+        movie_query = f"{query} смотреть фильм"
+
+        url = (
+            "https://yandex.ru/search/?text="
+            + quote(movie_query, safe="")
+        )
+
+        opened = webbrowser.open(
+            url,
+            new=2
+        )
+
+        if not opened:
+
+            return {
+                "success": False,
+                "message":
+                    "Не удалось открыть браузер."
+            }
+
+        return {
+            "success": True,
+            "query": query,
+            "url": url,
+            "message":
+                f"Открываю поиск фильма: {query}"
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "message":
+                f"Ошибка поиска фильма: {e}"
+        }
+
 
 
 # ============================================================
@@ -1042,56 +802,33 @@ def search_yandex_movie(
 
 KNOWN_WEBSITES = {
 
-    "youtube":
-        "https://www.youtube.com",
+    "youtube": "https://www.youtube.com",
+    "ютуб": "https://www.youtube.com",
 
-    "ютуб":
-        "https://www.youtube.com",
+    "google": "https://www.google.com",
+    "гугл": "https://www.google.com",
 
-    "google":
-        "https://www.google.com",
+    "yandex": "https://yandex.ru",
+    "яндекс": "https://yandex.ru",
 
-    "гугл":
-        "https://www.google.com",
+    "vk": "https://vk.com",
+    "вк": "https://vk.com",
 
-    "yandex":
-        "https://yandex.ru",
-
-    "яндекс":
-        "https://yandex.ru",
-
-    "vk":
-        "https://vk.com",
-
-    "вк":
-        "https://vk.com",
-
-    "telegram":
-        "https://web.telegram.org",
-
-    "телеграм":
-        "https://web.telegram.org",
+    "telegram": "https://web.telegram.org",
+    "телеграм": "https://web.telegram.org",
 }
 
 
-def open_website(
-    url: str
-):
+def open_website(url: str):
 
-    url = str(
-        url
-    ).strip()
+    url = str(url).strip()
 
     if not url:
 
         return {
-
             "success": False,
-
-            "message":
-                "URL пустой."
+            "message": "URL пустой."
         }
-
 
     if url.lower() in KNOWN_WEBSITES:
 
@@ -1099,19 +836,11 @@ def open_website(
             url.lower()
         ]
 
-
     if not url.startswith(
-        (
-            "http://",
-            "https://"
-        )
+        ("http://", "https://")
     ):
 
-        url = (
-            "https://"
-            + url
-        )
-
+        url = "https://" + url
 
     try:
 
@@ -1120,36 +849,25 @@ def open_website(
             new=2
         )
 
-
         if not opened:
 
             return {
-
                 "success": False,
-
                 "message":
                     "Не удалось открыть браузер."
             }
 
-
         return {
-
             "success": True,
-
-            "url":
-                url,
-
+            "url": url,
             "message":
                 f"Открыта страница: {url}"
         }
 
-
     except Exception as e:
 
         return {
-
             "success": False,
-
             "message":
                 f"Ошибка открытия сайта: {e}"
         }
@@ -1181,18 +899,13 @@ KNOWN_FOLDERS = {
 }
 
 
-def open_folder(
-    path: str
-):
+def open_folder(path: str):
 
     path = os.path.expandvars(
         str(path)
     )
 
-    path = os.path.expanduser(
-        path
-    )
-
+    path = os.path.expanduser(path)
 
     if path.lower() in KNOWN_FOLDERS:
 
@@ -1202,56 +915,37 @@ def open_folder(
             ]
         )
 
-
     if not path:
 
         return {
-
             "success": False,
-
-            "message":
-                "Путь не указан."
+            "message": "Путь не указан."
         }
-
 
     try:
 
         if not os.path.exists(path):
 
             return {
-
                 "success": False,
-
                 "message":
                     f"Путь не существует: {path}"
             }
 
-
-        os.startfile(
-            path
-        )
-
+        os.startfile(path)
 
         return {
-
             "success": True,
-
-            "path":
-                path,
-
+            "path": path,
             "message":
                 f"Открыта папка: {path}"
         }
 
-
     except Exception as e:
 
         return {
-
             "success": False,
-
-            "message":
-                str(e)
+            "message": str(e)
         }
 
 
@@ -1266,59 +960,44 @@ def get_downloads():
         / "Downloads"
     )
 
-
     if not downloads.exists():
 
         return {
-
             "success": False,
-
             "message":
                 "Папка Downloads не найдена."
         }
-
 
     try:
 
         files = []
 
-
         for item in downloads.iterdir():
 
             files.append({
 
-                "name":
-                    item.name,
+                "name": item.name,
 
                 "type":
-                    (
-                        "folder"
-                        if item.is_dir()
-                        else "file"
-                    )
+                    "folder"
+                    if item.is_dir()
+                    else "file"
             })
-
 
         return {
 
             "success": True,
 
-            "path":
-                str(downloads),
+            "path": str(downloads),
 
-            "items":
-                files[:100]
+            "items": files[:100]
         }
-
 
     except Exception as e:
 
         return {
-
             "success": False,
-
-            "message":
-                str(e)
+            "message": str(e)
         }
 
 
@@ -1326,9 +1005,7 @@ def get_downloads():
 # FIND FILE
 # ============================================================
 
-def find_file(
-    filename: str
-):
+def find_file(filename: str):
 
     filename = (
         str(filename)
@@ -1336,17 +1013,13 @@ def find_file(
         .strip()
     )
 
-
     if not filename:
 
         return {
-
             "success": False,
-
             "message":
                 "Имя файла не указано."
         }
-
 
     search_locations = [
 
@@ -1357,15 +1030,12 @@ def find_file(
         Path.home() / "Documents",
     ]
 
-
     results = []
-
 
     for location in search_locations:
 
         if not location.exists():
             continue
-
 
         try:
 
@@ -1373,36 +1043,24 @@ def find_file(
 
                 if filename in path.name.lower():
 
-                    results.append(
-                        str(path)
-                    )
-
+                    results.append(str(path))
 
                     if len(results) >= 30:
 
                         return {
-
                             "success": True,
-
-                            "results":
-                                results
+                            "results": results
                         }
-
 
         except (
             PermissionError,
             OSError
         ):
-
             continue
 
-
     return {
-
         "success": True,
-
-        "results":
-            results
+        "results": results
     }
 
 
@@ -1420,30 +1078,18 @@ MAX_DOWNLOAD_SIZE = (
 )
 
 
-async def download_file(
-    url: str
-):
+async def download_file(url: str):
 
-    url = str(
-        url
-    ).strip()
-
+    url = str(url).strip()
 
     if not url:
 
         return {
-
             "success": False,
-
-            "message":
-                "URL не указан."
+            "message": "URL не указан."
         }
 
-
-    parsed = urlparse(
-        url
-    )
-
+    parsed = urlparse(url)
 
     if parsed.scheme not in (
         "http",
@@ -1451,29 +1097,22 @@ async def download_file(
     ):
 
         return {
-
             "success": False,
-
             "message":
                 "Разрешены только HTTP и HTTPS."
         }
-
 
     DOWNLOAD_DIR.mkdir(
         parents=True,
         exist_ok=True
     )
 
-
     filename = Path(
         parsed.path
     ).name
 
-
     if not filename:
-
         filename = "download"
-
 
     filename = re.sub(
         r'[<>:"/\\|?*]',
@@ -1481,12 +1120,10 @@ async def download_file(
         filename
     )
 
-
     destination = (
         DOWNLOAD_DIR
         / filename
     )
-
 
     try:
 
@@ -1506,38 +1143,26 @@ async def download_file(
 
                 response.raise_for_status()
 
-
                 content_length = response.headers.get(
                     "content-length"
                 )
 
-
                 if content_length:
 
                     try:
-
-                        size = int(
-                            content_length
-                        )
-
+                        size = int(content_length)
                     except ValueError:
-
                         size = 0
-
 
                     if size > MAX_DOWNLOAD_SIZE:
 
                         return {
-
                             "success": False,
-
                             "message":
                                 "Файл слишком большой."
                         }
 
-
                 downloaded = 0
-
 
                 with open(
                     destination,
@@ -1548,32 +1173,21 @@ async def download_file(
                         1024 * 1024
                     ):
 
-                        downloaded += len(
-                            chunk
-                        )
-
+                        downloaded += len(chunk)
 
                         if downloaded > MAX_DOWNLOAD_SIZE:
-
-                            file.close()
 
                             destination.unlink(
                                 missing_ok=True
                             )
 
                             return {
-
                                 "success": False,
-
                                 "message":
                                     "Файл больше 2 ГБ."
                             }
 
-
-                        file.write(
-                            chunk
-                        )
-
+                        file.write(chunk)
 
         return {
 
@@ -1592,18 +1206,14 @@ async def download_file(
                 f"Файл скачан: {filename}"
         }
 
-
     except Exception as e:
 
         destination.unlink(
             missing_ok=True
         )
 
-
         return {
-
             "success": False,
-
             "message":
                 f"Ошибка загрузки: {e}"
         }
@@ -1618,32 +1228,20 @@ def open_requested(
     target_type: str = "auto"
 ):
 
-    target = str(
-        target
-    ).strip()
-
-    target_type = str(
-        target_type
-    ).lower().strip()
-
+    target = str(target).strip()
+    target_type = str(target_type).lower().strip()
 
     if not target:
 
         return {
-
             "success": False,
-
             "message":
                 "Не указано, что нужно открыть."
         }
 
-
     if target_type == "movie":
 
-        return search_yandex_movie(
-            target
-        )
-
+        return search_yandex_movie(target)
 
     if target_type == "application":
 
@@ -1651,107 +1249,67 @@ def open_requested(
             "steam",
             "стим"
         ):
-
             return open_steam()
 
-
-        return open_application(
-            target
-        )
-
+        return open_application(target)
 
     if target_type == "website":
 
-        return open_website(
-            target
-        )
-
+        return open_website(target)
 
     if target_type == "youtube":
 
-        return play_youtube(
-            target
-        )
-
+        return play_youtube(target)
 
     if target_type == "file":
 
-        result = find_file(
-            target
-        )
-
+        result = find_file(target)
 
         if not result.get("success"):
-
             return result
 
-
-        files = result.get(
-            "results",
-            []
-        )
-
+        files = result.get("results", [])
 
         if not files:
 
             return {
-
                 "success": False,
-
                 "message":
                     f"Файл '{target}' не найден."
             }
 
-
         try:
 
-            os.startfile(
-                files[0]
-            )
-
+            os.startfile(files[0])
 
             return {
-
                 "success": True,
-
-                "path":
-                    files[0],
-
+                "path": files[0],
                 "message":
                     f"Файл '{target}' открыт."
             }
 
-
         except Exception as e:
 
             return {
-
                 "success": False,
-
                 "message":
                     f"Не удалось открыть файл: {e}"
             }
 
-
     if target_type == "folder":
 
-        return open_folder(
-            target
-        )
-
+        return open_folder(target)
 
     if target_type == "auto":
 
         lower = target.lower().strip()
 
-
         if lower in (
             "steam",
             "стим"
         ):
-
             return open_steam()
-
 
         if lower in KNOWN_FOLDERS:
 
@@ -1763,7 +1321,6 @@ def open_requested(
                 )
             )
 
-
         if lower in KNOWN_WEBSITES:
 
             return open_website(
@@ -1772,22 +1329,18 @@ def open_requested(
                 ]
             )
 
-
         youtube_prefixes = (
 
             "включи музыку ",
-
             "включи песню ",
-
             "включи видео ",
-
             "включи ролик ",
-
             "найди на youtube ",
-
             "найди на ютуб ",
+            "play music ",
+            "play song ",
+            "play video ",
         )
-
 
         for prefix in youtube_prefixes:
 
@@ -1797,30 +1350,16 @@ def open_requested(
                     len(prefix):
                 ].strip()
 
-
                 if query:
+                    return play_youtube(query)
 
-                    return play_youtube(
-                        query
-                    )
-
-
-        application = find_application(
-            target
-        )
-
+        application = find_application(target)
 
         if application:
 
-            return open_application(
-                target
-            )
+            return open_application(target)
 
-
-        file_result = find_file(
-            target
-        )
-
+        file_result = find_file(target)
 
         if file_result.get("success"):
 
@@ -1829,47 +1368,31 @@ def open_requested(
                 []
             )
 
-
             if files:
 
                 try:
 
-                    os.startfile(
-                        files[0]
-                    )
-
+                    os.startfile(files[0])
 
                     return {
-
                         "success": True,
-
-                        "path":
-                            files[0],
-
+                        "path": files[0],
                         "message":
                             f"Файл '{target}' открыт."
                     }
 
-
                 except Exception:
-
                     pass
 
-
         return {
-
             "success": False,
-
             "message":
                 f"Не удалось определить, "
                 f"что открыть: '{target}'."
         }
 
-
     return {
-
         "success": False,
-
         "message":
             f"Неизвестный тип объекта: {target_type}"
     }
@@ -1883,46 +1406,31 @@ def get_camera():
 
     global camera
 
-
     if cv2 is None:
-
         return None
-
 
     with camera_lock:
 
         if camera is None or not camera.isOpened():
 
-            print(
-                "Открываем камеру..."
-            )
+            print("Открываем камеру...")
 
-
-            # Для Windows CAP_DSHOW часто работает лучше.
             camera = cv2.VideoCapture(
                 0,
                 cv2.CAP_DSHOW
             )
 
+            if not camera.isOpened():
+
+                camera = cv2.VideoCapture(0)
 
             if not camera.isOpened():
 
-                # Второй вариант
-                camera = cv2.VideoCapture(
-                    0
-                )
-
-
-            if not camera.isOpened():
-
-                print(
-                    "Камера не открылась."
-                )
+                print("Камера не открылась.")
 
                 camera = None
 
                 return None
-
 
             camera.set(
                 cv2.CAP_PROP_FRAME_WIDTH,
@@ -1934,88 +1442,54 @@ def get_camera():
                 480
             )
 
-
-            print(
-                "Камера открыта."
-            )
-
+            print("Камера открыта.")
 
         return camera
 
 
-# ============================================================
-# CAMERA RELEASE
-# ============================================================
-
 def release_camera():
 
     global camera
-
 
     with camera_lock:
 
         if camera is not None:
 
             try:
-
                 camera.release()
-
             except Exception:
-
                 pass
 
-
             camera = None
-
 
     if cv2 is not None:
 
         try:
-
             cv2.destroyAllWindows()
-
         except Exception:
-
             pass
 
+    print("Камера освобождена.")
 
-    print(
-        "Камера освобождена."
-    )
-
-
-# ============================================================
-# START CAMERA
-# ============================================================
 
 def start_camera():
 
     cam = get_camera()
 
-
     if cam is None:
 
         return {
-
             "success": False,
-
             "message":
                 "Камера не найдена или не может быть открыта."
         }
 
-
     return {
-
         "success": True,
-
         "message":
-            "Камера запущена. Открой /camera."
+            "Камера запущена. Открой раздел камеры."
     }
 
-
-# ============================================================
-# CAMERA FRAMES
-# ============================================================
 
 def generate_camera_frames():
 
@@ -2023,34 +1497,19 @@ def generate_camera_frames():
 
         cam = get_camera()
 
-
         if cam is None:
 
             time.sleep(1)
-
             continue
-
 
         success, frame = cam.read()
 
-
         if not success:
 
-            print(
-                "Не удалось получить кадр."
-            )
-
             time.sleep(0.1)
-
             continue
 
-
         person_count = 0
-
-
-        # ====================================================
-        # YOLO
-        # ====================================================
 
         if model is not None:
 
@@ -2061,16 +1520,12 @@ def generate_camera_frames():
                     verbose=False
                 )
 
-
                 for result in results:
 
                     boxes = result.boxes
 
-
                     if boxes is None:
-
                         continue
-
 
                     for box in boxes:
 
@@ -2078,70 +1533,43 @@ def generate_camera_frames():
                             box.cls[0]
                         )
 
-
-                        # COCO:
-                        # 0 = person
                         if class_id != 0:
-
                             continue
-
 
                         confidence = float(
                             box.conf[0]
                         )
 
-
                         if confidence < 0.45:
-
                             continue
 
-
                         person_count += 1
-
 
                         x1, y1, x2, y2 = map(
                             int,
                             box.xyxy[0]
                         )
 
-
                         cv2.rectangle(
-
                             frame,
-
                             (x1, y1),
-
                             (x2, y2),
-
                             (0, 255, 0),
-
                             2
                         )
-
 
                         cv2.putText(
-
                             frame,
-
                             f"Person {confidence:.2f}",
-
                             (
                                 x1,
-                                max(
-                                    y1 - 10,
-                                    20
-                                )
+                                max(y1 - 10, 20)
                             ),
-
                             cv2.FONT_HERSHEY_SIMPLEX,
-
                             0.6,
-
                             (0, 255, 0),
-
                             2
                         )
-
 
             except Exception as e:
 
@@ -2150,64 +1578,33 @@ def generate_camera_frames():
                     e
                 )
 
-
-        # ====================================================
-        # PEOPLE COUNTER
-        # ====================================================
-
-        if cv2 is not None:
-
-            cv2.putText(
-
-                frame,
-
-                f"People: {person_count}",
-
-                (20, 40),
-
-                cv2.FONT_HERSHEY_SIMPLEX,
-
-                1,
-
-                (0, 255, 255),
-
-                2
-            )
-
-
-        # ====================================================
-        # JPEG
-        # ====================================================
+        cv2.putText(
+            frame,
+            f"PEOPLE: {person_count}",
+            (20, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 255, 255),
+            2
+        )
 
         ret, buffer = cv2.imencode(
             ".jpg",
             frame
         )
 
-
         if not ret:
-
             continue
-
 
         frame_bytes = buffer.tobytes()
 
-
         yield (
-
             b"--frame\r\n"
-
             b"Content-Type: image/jpeg\r\n\r\n"
-
             + frame_bytes
-
             + b"\r\n"
         )
 
-
-# ============================================================
-# CAMERA API
-# ============================================================
 
 @app.get("/camera")
 def camera_stream():
@@ -2215,23 +1612,16 @@ def camera_stream():
     if cv2 is None:
 
         return JSONResponse(
-
             {
-
                 "success": False,
-
                 "message":
                     "OpenCV не установлен."
             },
-
             status_code=500
         )
 
-
     return StreamingResponse(
-
         generate_camera_frames(),
-
         media_type=(
             "multipart/x-mixed-replace;"
             " boundary=frame"
@@ -2240,7 +1630,7 @@ def camera_stream():
 
 
 # ============================================================
-# TOOL DEFINITIONS
+# TOOLS
 # ============================================================
 
 TOOLS = [
@@ -2250,56 +1640,43 @@ TOOLS = [
 
         "function": {
 
-            "name":
-                "get_pc_info",
+            "name": "get_pc_info",
 
             "description":
                 "Получить информацию о компьютере.",
 
             "parameters": {
-
-                "type":
-                    "object",
-
+                "type": "object",
                 "properties": {},
-
                 "required": []
             }
         }
     },
-
 
     {
         "type": "function",
 
         "function": {
 
-            "name":
-                "get_applications",
+            "name": "get_applications",
 
             "description":
-                "Получить список приложений.",
+                "Получить список установленных приложений.",
 
             "parameters": {
-
-                "type":
-                    "object",
-
+                "type": "object",
                 "properties": {},
-
                 "required": []
             }
         }
     },
-
 
     {
         "type": "function",
 
         "function": {
 
-            "name":
-                "open_requested",
+            "name": "open_requested",
 
             "description":
                 "Открыть приложение, Steam, сайт, "
@@ -2307,77 +1684,58 @@ TOOLS = [
 
             "parameters": {
 
-                "type":
-                    "object",
+                "type": "object",
 
                 "properties": {
 
                     "target": {
-
-                        "type":
-                            "string",
-
+                        "type": "string",
                         "description":
                             "Название или путь."
                     },
 
                     "target_type": {
 
-                        "type":
-                            "string",
+                        "type": "string",
 
                         "enum": [
-
                             "auto",
-
                             "application",
-
                             "website",
-
                             "youtube",
-
                             "movie",
-
                             "file",
-
                             "folder"
                         ]
                     }
                 },
 
                 "required": [
-
                     "target",
-
                     "target_type"
                 ]
             }
         }
     },
 
-
     {
         "type": "function",
 
         "function": {
 
-            "name":
-                "search_yandex",
+            "name": "search_yandex",
 
             "description":
                 "Открыть поиск Яндекс.",
 
             "parameters": {
 
-                "type":
-                    "object",
+                "type": "object",
 
                 "properties": {
 
                     "query": {
-
-                        "type":
-                            "string"
+                        "type": "string"
                     }
                 },
 
@@ -2388,53 +1746,42 @@ TOOLS = [
         }
     },
 
-
     {
         "type": "function",
 
         "function": {
 
-            "name":
-                "get_downloads",
+            "name": "get_downloads",
 
             "description":
                 "Получить содержимое Downloads.",
 
             "parameters": {
-
-                "type":
-                    "object",
-
+                "type": "object",
                 "properties": {},
-
                 "required": []
             }
         }
     },
-
 
     {
         "type": "function",
 
         "function": {
 
-            "name":
-                "find_file",
+            "name": "find_file",
 
             "description":
-                "Найти файл.",
+                "Найти файл на компьютере.",
 
             "parameters": {
 
-                "type":
-                    "object",
+                "type": "object",
 
                 "properties": {
 
                     "filename": {
-
-                        "type":
-                            "string"
+                        "type": "string"
                     }
                 },
 
@@ -2445,29 +1792,24 @@ TOOLS = [
         }
     },
 
-
     {
         "type": "function",
 
         "function": {
 
-            "name":
-                "download_file",
+            "name": "download_file",
 
             "description":
                 "Скачать файл по HTTP или HTTPS.",
 
             "parameters": {
 
-                "type":
-                    "object",
+                "type": "object",
 
                 "properties": {
 
                     "url": {
-
-                        "type":
-                            "string"
+                        "type": "string"
                     }
                 },
 
@@ -2478,25 +1820,19 @@ TOOLS = [
         }
     },
 
-
     {
         "type": "function",
 
         "function": {
 
-            "name":
-                "start_camera",
+            "name": "start_camera",
 
             "description":
                 "Запустить локальную камеру компьютера.",
 
             "parameters": {
-
-                "type":
-                    "object",
-
+                "type": "object",
                 "properties": {},
-
                 "required": []
             }
         }
@@ -2516,89 +1852,67 @@ async def execute_tool(
     try:
 
         if name == "get_pc_info":
-
             return get_pc_info()
 
-
         if name == "get_applications":
-
             return get_applications()
-
 
         if name == "open_requested":
 
             return open_requested(
-
                 arguments.get(
                     "target",
                     ""
                 ),
-
                 arguments.get(
                     "target_type",
                     "auto"
                 )
             )
 
-
         if name == "search_yandex":
 
             return search_yandex(
-
                 arguments.get(
                     "query",
                     ""
                 )
             )
 
-
         if name == "get_downloads":
-
             return get_downloads()
-
 
         if name == "find_file":
 
             return find_file(
-
                 arguments.get(
                     "filename",
                     ""
                 )
             )
 
-
         if name == "download_file":
 
             return await download_file(
-
                 arguments.get(
                     "url",
                     ""
                 )
             )
 
-
         if name == "start_camera":
-
             return start_camera()
 
-
         return {
-
             "success": False,
-
             "message":
                 f"Неизвестный инструмент: {name}"
         }
 
-
     except Exception as e:
 
         return {
-
             "success": False,
-
             "message":
                 f"Ошибка инструмента {name}: {e}"
         }
@@ -2608,51 +1922,81 @@ async def execute_tool(
 # GROQ
 # ============================================================
 
-async def ask_groq(
-    text: str
-):
+async def ask_groq(text: str):
 
     if not GROQ_API_KEY:
 
         return {
-
             "answer":
                 "GROQ_API_KEY не найден. "
                 "Проверь файл .env.",
-
-            "action":
-                "none",
-
-            "query":
-                ""
+            "action": "none",
+            "query": ""
         }
 
-
     system_message = """
+Ты JARVIS — интеллектуальный локальный AI-помощник.
 
-Ты Jarvis — локальный AI-помощник.
+Ты должен вести себя как современный голосовой ассистент.
 
-Отвечай на русском языке.
+ГЛАВНОЕ:
 
-Ты умеешь:
+1. Отвечай на языке пользователя.
 
-- отвечать на обычные вопросы;
-- получать информацию о компьютере;
-- запускать приложения;
-- запускать Steam;
-- открывать сайты;
-- искать через Яндекс;
-- искать файлы;
-- открывать файлы;
-- открывать папки;
-- смотреть Downloads;
-- открывать YouTube;
-- искать музыку и видео на YouTube;
-- искать фильмы;
-- скачивать файлы;
-- запускать локальную камеру.
+2. Если пользователь пишет по-русски — отвечай по-русски.
 
-ПРАВИЛА:
+3. Если пользователь пишет на английском — отвечай на английском.
+
+4. Если пользователь использует другой язык — отвечай на этом языке,
+   если ты способен его поддерживать.
+
+5. Пользователь может попросить тебя ПЕРЕВЕСТИ текст.
+   В таком случае переводи максимально точно.
+
+6. Поддерживай перевод между любыми языками,
+   которые поддерживает используемая AI-модель.
+
+7. При переводе не добавляй лишних объяснений,
+   если пользователь их не просил.
+
+8. Сохраняй смысл, стиль и структуру оригинала.
+
+9. Если пользователь явно указывает язык перевода,
+   переводи именно на него.
+
+10. Если пользователь говорит:
+    "переведи на английский",
+    "translate to English",
+    "переведи на китайский",
+    "translate this to Spanish"
+    и т.п. — выполняй перевод.
+
+11. Если пользователь просит произнести текст,
+    просто верни текст, который нужно произнести.
+
+ВОЗМОЖНОСТИ:
+
+- обычный разговор;
+- ответы на вопросы;
+- перевод;
+- многоязычное общение;
+- информация о компьютере;
+- запуск приложений;
+- запуск Steam;
+- открытие сайтов;
+- поиск через Яндекс;
+- YouTube;
+- музыка;
+- видео;
+- фильмы;
+- поиск файлов;
+- открытие файлов;
+- открытие папок;
+- просмотр Downloads;
+- скачивание файлов;
+- локальная камера.
+
+ПРАВИЛА ИНСТРУМЕНТОВ:
 
 1. Если для действия нужен инструмент — используй инструмент.
 
@@ -2664,7 +2008,7 @@ async def ask_groq(
 4. Если success=false — не говори,
    что действие выполнено.
 
-5. Для информации о ПК используй get_pc_info.
+5. Для информации о компьютере используй get_pc_info.
 
 6. Для запуска приложения используй open_requested
    с target_type="application".
@@ -2687,12 +2031,19 @@ async def ask_groq(
 
 14. Для музыки, песни, видео или ролика
     используй YouTube.
+15. Если пользователь просит посмотреть, найти или открыть фильм,
+используй open_requested с target_type="movie".
 
-15. Для поиска фильма используй target_type="movie".
+16. Если пользователь говорит:
+"включи фильм X",
+"запусти фильм X",
+"найди фильм X",
+"хочу посмотреть X",
+"покажи фильм X",
+то используй open_requested с target_type="movie".
 
-16. Для Downloads используй get_downloads.
-
-17. Для поиска файла используй find_file.
+17. Для фильма обязательно передавай только название фильма
+в параметре target, без слов "фильм", "посмотреть" и т.п.
 
 18. Для скачивания используй download_file.
 
@@ -2700,50 +2051,38 @@ async def ask_groq(
 
 20. Камера является локальной камерой компьютера.
 
-21. Не выполняй распознавание личности.
+БЕЗОПАСНОСТЬ:
 
-22. Не выполняй распознавание лиц.
+- Не выполняй распознавание личности.
+- Не выполняй распознавание лиц.
+- Не используй камеру для слежки.
+- Не удаляй файлы.
+- Не форматируй диски.
+- Не отключай антивирус.
+- Не выполняй опасные системные операции.
 
-23. Не используй камеру для слежки.
-
-24. Не удаляй файлы.
-
-25. Не форматируй диски.
-
-26. Не отключай антивирус.
-
-27. Не выполняй опасные системные операции.
-
-28. После выполнения инструмента отвечай кратко.
-
+После выполнения инструмента отвечай кратко.
 """
 
 
     messages = [
 
         {
-            "role":
-                "system",
-
-            "content":
-                system_message
+            "role": "system",
+            "content": system_message
         }
 
     ]
-
 
     messages.extend(
         conversation_history
     )
 
-
     messages.append({
 
-        "role":
-            "user",
+        "role": "user",
+        "content": text
 
-        "content":
-            text
     })
 
 
@@ -2759,20 +2098,15 @@ async def ask_groq(
 
     data = {
 
-        "model":
-            GROQ_MODEL,
+        "model": GROQ_MODEL,
 
-        "messages":
-            messages,
+        "messages": messages,
 
-        "tools":
-            TOOLS,
+        "tools": TOOLS,
 
-        "tool_choice":
-            "auto",
+        "tool_choice": "auto",
 
-        "temperature":
-            0.2
+        "temperature": 0.2
     }
 
 
@@ -2783,11 +2117,8 @@ async def ask_groq(
         ) as client:
 
             response = await client.post(
-
                 GROQ_URL,
-
                 headers=headers,
-
                 json=data
             )
 
@@ -2805,7 +2136,6 @@ async def ask_groq(
                 response.text
             )
 
-
             return {
 
                 "answer":
@@ -2813,11 +2143,9 @@ async def ask_groq(
                     f"{response.status_code}: "
                     f"{response.text[:500]}",
 
-                "action":
-                    "none",
+                "action": "none",
 
-                "query":
-                    ""
+                "query": ""
             }
 
 
@@ -2832,11 +2160,9 @@ async def ask_groq(
                 "answer":
                     "Groq вернул некорректный JSON.",
 
-                "action":
-                    "none",
+                "action": "none",
 
-                "query":
-                    ""
+                "query": ""
             }
 
 
@@ -2853,11 +2179,9 @@ async def ask_groq(
                 "answer":
                     "Groq не вернул ответ.",
 
-                "action":
-                    "none",
+                "action": "none",
 
-                "query":
-                    ""
+                "query": ""
             }
 
 
@@ -2874,11 +2198,9 @@ async def ask_groq(
                 "answer":
                     "Groq не вернул сообщение.",
 
-                "action":
-                    "none",
+                "action": "none",
 
-                "query":
-                    ""
+                "query": ""
             }
 
 
@@ -2894,10 +2216,7 @@ async def ask_groq(
 
         if tool_calls:
 
-            messages.append(
-                message
-            )
-
+            messages.append(message)
 
             for tool_call in tool_calls:
 
@@ -2906,18 +2225,15 @@ async def ask_groq(
                     {}
                 )
 
-
                 name = function.get(
                     "name",
                     ""
                 )
 
-
                 arguments_text = function.get(
                     "arguments",
                     "{}"
                 )
-
 
                 try:
 
@@ -2932,9 +2248,10 @@ async def ask_groq(
 
                 print()
                 print(
-                    "Jarvis tool:",
+                    "JARVIS TOOL:",
                     name
                 )
+
                 print(
                     "Arguments:",
                     arguments
@@ -2955,8 +2272,7 @@ async def ask_groq(
 
                 messages.append({
 
-                    "role":
-                        "tool",
+                    "role": "tool",
 
                     "tool_call_id":
                         tool_call.get(
@@ -2964,8 +2280,7 @@ async def ask_groq(
                             ""
                         ),
 
-                    "name":
-                        name,
+                    "name": name,
 
                     "content":
                         json.dumps(
@@ -2981,20 +2296,15 @@ async def ask_groq(
 
             second_data = {
 
-                "model":
-                    GROQ_MODEL,
+                "model": GROQ_MODEL,
 
-                "messages":
-                    messages,
+                "messages": messages,
 
-                "tools":
-                    TOOLS,
+                "tools": TOOLS,
 
-                "tool_choice":
-                    "none",
+                "tool_choice": "none",
 
-                "temperature":
-                    0.2
+                "temperature": 0.2
             }
 
 
@@ -3020,11 +2330,6 @@ async def ask_groq(
 
             if second_response.status_code != 200:
 
-                print(
-                    second_response.text
-                )
-
-
                 return {
 
                     "answer":
@@ -3032,11 +2337,9 @@ async def ask_groq(
                         "но Groq не смог сформировать "
                         "финальный ответ.",
 
-                    "action":
-                        "none",
+                    "action": "none",
 
-                    "query":
-                        ""
+                    "query": ""
                 }
 
 
@@ -3053,11 +2356,9 @@ async def ask_groq(
                     "answer":
                         "Groq вернул некорректный ответ.",
 
-                    "action":
-                        "none",
+                    "action": "none",
 
-                    "query":
-                        ""
+                    "query": ""
                 }
 
 
@@ -3077,7 +2378,6 @@ async def ask_groq(
                     )
                 )
 
-
                 answer = (
                     second_message.get(
                         "content"
@@ -3085,18 +2385,14 @@ async def ask_groq(
                     or "Команда выполнена."
                 )
 
-
             else:
 
                 answer = "Команда выполнена."
 
-
         else:
 
             answer = (
-                message.get(
-                    "content"
-                )
+                message.get("content")
                 or "Не удалось получить ответ."
             )
 
@@ -3110,41 +2406,32 @@ async def ask_groq(
 
         conversation_history.append({
 
-            "role":
-                "user",
+            "role": "user",
 
-            "content":
-                text
+            "content": text
         })
 
 
         conversation_history.append({
 
-            "role":
-                "assistant",
+            "role": "assistant",
 
-            "content":
-                answer
+            "content": answer
         })
 
 
         while len(conversation_history) > MAX_HISTORY:
 
-            conversation_history.pop(
-                0
-            )
+            conversation_history.pop(0)
 
 
         return {
 
-            "answer":
-                answer,
+            "answer": answer,
 
-            "action":
-                "none",
+            "action": "none",
 
-            "query":
-                ""
+            "query": ""
         }
 
 
@@ -3155,17 +2442,14 @@ async def ask_groq(
             repr(e)
         )
 
-
         return {
 
             "answer":
                 f"Ошибка подключения к Groq: {e}",
 
-            "action":
-                "none",
+            "action": "none",
 
-            "query":
-                ""
+            "query": ""
         }
 
 
@@ -3176,17 +2460,14 @@ async def ask_groq(
             repr(e)
         )
 
-
         return {
 
             "answer":
                 f"Произошла ошибка: {e}",
 
-            "action":
-                "none",
+            "action": "none",
 
-            "query":
-                ""
+            "query": ""
         }
 
 
@@ -3199,13 +2480,9 @@ async def chat(
     text: str = Form(...)
 ):
 
-    result = await ask_groq(
-        text
-    )
+    result = await ask_groq(text)
 
-    return JSONResponse(
-        result
-    )
+    return JSONResponse(result)
 
 
 # ============================================================
@@ -3216,7 +2493,7 @@ async def chat(
 def home():
 
     return HTMLResponse(
-        """
+        r"""
 <!DOCTYPE html>
 
 <html lang="ru">
@@ -3230,109 +2507,463 @@ def home():
     content="width=device-width, initial-scale=1.0"
 >
 
-<title>My Jarvis</title>
+<title>🤖 JARVIS AI</title>
+
+<link
+    rel="icon"
+    href="data:image/svg+xml,
+    <svg xmlns='http://www.w3.org/2000/svg'
+    viewBox='0 0 100 100'>
+    <text y='.9em' font-size='90'>🤖</text>
+    </svg>"
+>
 
 <style>
+
+/* =========================================================
+   JARVIS / IRON MAN STYLE
+   ========================================================= */
+
+:root {
+
+    --blue: #00d9ff;
+    --blue2: #008cff;
+
+    --red: #ff1744;
+    --red2: #ff4b2b;
+
+    --cyan: #00ffff;
+
+    --bg: #02050a;
+
+    --panel:
+        rgba(5, 15, 27, 0.88);
+
+    --border:
+        rgba(0, 217, 255, .45);
+}
+
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
 
 * {
     box-sizing: border-box;
 }
 
+
+html,
 body {
 
     margin: 0;
 
-    min-height: 100vh;
+    width: 100%;
 
-    background:
-        radial-gradient(
-            circle at top,
-            #18243a,
-            #080b10 65%
-        );
-
-    color: white;
+    min-height: 100%;
 
     font-family:
         Arial,
+        Helvetica,
         sans-serif;
 
-    padding: 30px 20px;
+    background:
+        #02050a;
+
+    color: white;
 }
+
+
+/* =========================================================
+   IRON MAN BACKGROUND
+   ========================================================= */
+
+body {
+
+    min-height: 100vh;
+
+    overflow-x: hidden;
+
+    background:
+
+        radial-gradient(
+            circle at 50% 30%,
+            rgba(0, 150, 255, .15),
+            transparent 30%
+        ),
+
+        radial-gradient(
+            circle at 15% 80%,
+            rgba(255, 0, 50, .08),
+            transparent 30%
+        ),
+
+        radial-gradient(
+            circle at 85% 80%,
+            rgba(0, 200, 255, .08),
+            transparent 30%
+        ),
+
+        linear-gradient(
+            135deg,
+            #02050a,
+            #06101c 50%,
+            #02050a
+        );
+}
+
+
+/* =========================================================
+   GRID
+   ========================================================= */
+
+body::before {
+
+    content: "";
+
+    position: fixed;
+
+    inset: 0;
+
+    pointer-events: none;
+
+    opacity: .16;
+
+    background-image:
+
+        linear-gradient(
+            rgba(0, 217, 255, .12) 1px,
+            transparent 1px
+        ),
+
+        linear-gradient(
+            90deg,
+            rgba(0, 217, 255, .12) 1px,
+            transparent 1px
+        );
+
+    background-size:
+        45px 45px;
+
+    mask-image:
+        linear-gradient(
+            to bottom,
+            black,
+            transparent
+        );
+
+    z-index: 0;
+}
+
+
+/* =========================================================
+   SCANLINE
+   ========================================================= */
+
+body::after {
+
+    content: "";
+
+    position: fixed;
+
+    left: 0;
+    right: 0;
+
+    height: 2px;
+
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            rgba(0, 217, 255, .7),
+            transparent
+        );
+
+    animation:
+        scan 5s linear infinite;
+
+    pointer-events: none;
+
+    z-index: 50;
+}
+
+
+@keyframes scan {
+
+    0% {
+        top: 0;
+    }
+
+    100% {
+        top: 100%;
+    }
+}
+
+
+/* =========================================================
+   CONTAINER
+   ========================================================= */
 
 .container {
 
-    max-width: 1000px;
+    position: relative;
 
-    margin: auto;
+    z-index: 2;
+
+    width: min(
+        1100px,
+        calc(100% - 30px)
+    );
+
+    margin: 0 auto;
+
+    padding:
+        25px 0 50px;
 }
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.header {
+
+    position: relative;
+
+    text-align: center;
+
+    padding: 25px;
+
+    margin-bottom: 20px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius: 20px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(0, 25, 45, .9),
+            rgba(2, 8, 15, .9)
+        );
+
+    box-shadow:
+
+        0 0 30px
+        rgba(0, 217, 255, .15),
+
+        inset 0 0 30px
+        rgba(0, 217, 255, .03);
+}
+
+
+/* =========================================================
+   ROBOT ICON
+   ========================================================= */
+
+.robot {
+
+    font-size: 75px;
+
+    line-height: 1;
+
+    margin-bottom: 10px;
+
+    filter:
+        drop-shadow(
+            0 0 15px
+            rgba(0, 217, 255, .8)
+        );
+
+    animation:
+        robotPulse 2s ease-in-out infinite;
+}
+
+
+@keyframes robotPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.06);
+    }
+}
+
+
+/* =========================================================
+   TITLE
+   ========================================================= */
 
 h1 {
 
-    text-align: center;
+    margin: 0;
 
-    color: #4fc3f7;
+    color: var(--blue);
 
-    font-size: 42px;
+    font-size:
+        clamp(35px, 6vw, 60px);
 
-    margin-bottom: 5px;
+    letter-spacing: 8px;
 
     text-shadow:
+
+        0 0 8px
+        var(--blue),
+
         0 0 25px
-        rgba(79, 195, 247, .5);
+        rgba(0, 217, 255, .8);
 }
+
 
 .subtitle {
 
-    text-align: center;
+    margin-top: 10px;
 
-    color: #888;
+    color: #8ba8b8;
 
-    margin-bottom: 30px;
+    letter-spacing: 3px;
+
+    text-transform: uppercase;
+
+    font-size: 13px;
 }
 
-.controls {
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+
+.status-panel {
 
     display: flex;
 
+    justify-content: center;
+
+    align-items: center;
+
     gap: 10px;
 
-    margin-bottom: 20px;
+    margin: 15px 0;
+
+    color: #8ea6b6;
+
+    font-size: 13px;
 }
 
-input {
 
-    flex: 1;
+.status-dot {
 
-    padding: 15px;
+    width: 10px;
+
+    height: 10px;
+
+    border-radius: 50%;
+
+    background: #00ff9d;
+
+    box-shadow:
+        0 0 12px #00ff9d;
+
+    animation:
+        statusPulse 1.5s infinite;
+}
+
+
+@keyframes statusPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: .35;
+    }
+}
+
+
+/* =========================================================
+   CONTROLS
+   ========================================================= */
+
+.controls {
+
+    display: grid;
+
+    grid-template-columns:
+        1fr
+        auto
+        auto
+        auto;
+
+    gap: 10px;
+
+    margin-bottom: 15px;
+}
+
+
+input,
+select {
+
+    width: 100%;
+
+    padding: 16px;
 
     border-radius: 12px;
 
-    border: 1px solid #333;
+    border:
+        1px solid
+        rgba(0, 217, 255, .35);
 
-    background: #171b22;
+    background:
+        rgba(3, 13, 23, .9);
 
     color: white;
 
-    font-size: 17px;
+    font-size: 16px;
 
     outline: none;
+
+    transition: .2s;
 }
 
-input:focus {
 
-    border-color: #4fc3f7;
+input:focus,
+select:focus {
+
+    border-color:
+        var(--blue);
 
     box-shadow:
-        0 0 10px
-        rgba(79, 195, 247, .2);
+        0 0 18px
+        rgba(0, 217, 255, .2);
 }
+
+
+select {
+
+    max-width: 170px;
+
+    cursor: pointer;
+}
+
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
 
 button {
 
-    padding: 12px 18px;
+    padding:
+        12px 18px;
 
-    border: none;
+    border: 1px solid
+        rgba(0, 217, 255, .4);
 
     border-radius: 12px;
 
@@ -3340,46 +2971,100 @@ button {
 
     cursor: pointer;
 
-    font-size: 16px;
+    font-size: 15px;
+
+    background:
+        rgba(0, 40, 65, .8);
+
+    transition:
+        transform .15s,
+        box-shadow .15s,
+        background .15s;
 }
 
-#send {
-
-    background: #1976d2;
-}
-
-#mic {
-
-    background: #b00020;
-}
-
-#cameraButton {
-
-    background: #00897b;
-}
 
 button:hover {
 
-    opacity: .85;
+    transform:
+        translateY(-2px);
+
+    box-shadow:
+        0 0 20px
+        rgba(0, 217, 255, .25);
 }
 
-button:disabled {
 
-    opacity: .4;
+#send {
 
-    cursor: not-allowed;
+    background:
+        linear-gradient(
+            135deg,
+            #0066ff,
+            #00a6ff
+        );
 }
 
-#status {
 
-    text-align: center;
+#mic {
 
-    color: #aaa;
-
-    min-height: 25px;
-
-    margin-bottom: 15px;
+    background:
+        linear-gradient(
+            135deg,
+            #9b001e,
+            #ff1744
+        );
 }
+
+
+#cameraButton {
+
+    background:
+        linear-gradient(
+            135deg,
+            #006b68,
+            #00a99d
+        );
+}
+
+
+/* =========================================================
+   LANGUAGE PANEL
+   ========================================================= */
+
+.language-panel {
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    gap: 10px;
+
+    margin:
+        10px 0 20px;
+
+    color: #78909c;
+
+    font-size: 13px;
+}
+
+
+.language-panel select {
+
+    width: auto;
+
+    max-width: 220px;
+
+    padding: 9px 12px;
+
+    font-size: 13px;
+}
+
+
+/* =========================================================
+   CHAT
+   ========================================================= */
 
 #chat {
 
@@ -3387,19 +3072,58 @@ button:disabled {
 
     flex-direction: column;
 
-    gap: 12px;
+    gap: 15px;
+
+    min-height: 150px;
 }
+
 
 .message {
 
-    padding: 15px;
+    position: relative;
 
-    border-radius: 14px;
+    padding: 16px 18px;
 
-    line-height: 1.5;
+    border-radius: 15px;
+
+    line-height: 1.55;
 
     white-space: pre-wrap;
+
+    animation:
+        messageIn .25s ease-out;
 }
+
+
+@keyframes messageIn {
+
+    from {
+        opacity: 0;
+        transform:
+            translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform:
+            translateY(0);
+    }
+}
+
+
+.message b {
+
+    display: block;
+
+    margin-bottom: 6px;
+
+    font-size: 12px;
+
+    letter-spacing: 2px;
+
+    text-transform: uppercase;
+}
+
 
 .user {
 
@@ -3407,8 +3131,28 @@ button:disabled {
 
     max-width: 80%;
 
-    background: #174ea6;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(0, 78, 170, .8),
+            rgba(0, 40, 90, .8)
+        );
+
+    border:
+        1px solid
+        rgba(0, 150, 255, .45);
+
+    box-shadow:
+        0 0 20px
+        rgba(0, 100, 255, .08);
 }
+
+
+.user b {
+
+    color: #58c7ff;
+}
+
 
 .bot {
 
@@ -3416,32 +3160,54 @@ button:disabled {
 
     max-width: 90%;
 
-    background: #20252d;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(15, 28, 40, .95),
+            rgba(5, 15, 25, .95)
+        );
+
+    border:
+        1px solid
+        rgba(0, 217, 255, .3);
+
+    box-shadow:
+        0 0 25px
+        rgba(0, 217, 255, .08);
 }
+
+
+.bot b {
+
+    color: var(--blue);
+}
+
+
+/* =========================================================
+   CAMERA
+   ========================================================= */
 
 .camera {
 
     display: none;
 
-    margin-top: 30px;
+    margin-top: 25px;
 
-    background: #111;
+    overflow: hidden;
 
     border:
         1px solid
-        #333;
+        rgba(0, 217, 255, .4);
 
-    border-radius: 15px;
+    border-radius: 18px;
 
-    overflow: hidden;
+    background: #000;
+
+    box-shadow:
+        0 0 35px
+        rgba(0, 217, 255, .12);
 }
 
-.camera img {
-
-    width: 100%;
-
-    display: block;
-}
 
 .camera-title {
 
@@ -3449,7 +3215,140 @@ button:disabled {
 
     text-align: center;
 
-    color: #4fc3f7;
+    color: var(--blue);
+
+    background:
+        rgba(0, 25, 40, .9);
+
+    letter-spacing: 3px;
+}
+
+
+.camera img {
+
+    display: block;
+
+    width: 100%;
+}
+
+
+/* =========================================================
+   ARC REACTOR
+   ========================================================= */
+
+.reactor {
+
+    width: 80px;
+
+    height: 80px;
+
+    margin:
+        20px auto 0;
+
+    border-radius: 50%;
+
+    border:
+        3px solid
+        rgba(0, 217, 255, .6);
+
+    box-shadow:
+
+        0 0 10px
+        #00d9ff,
+
+        0 0 30px
+        rgba(0, 217, 255, .6),
+
+        inset 0 0 20px
+        rgba(0, 217, 255, .6);
+
+    position: relative;
+
+    animation:
+        reactor 2s linear infinite;
+}
+
+
+.reactor::before {
+
+    content: "";
+
+    position: absolute;
+
+    inset: 12px;
+
+    border-radius: 50%;
+
+    border:
+        3px solid
+        #ffffff;
+
+    box-shadow:
+        0 0 20px
+        #00d9ff;
+}
+
+
+@keyframes reactor {
+
+    from {
+        transform:
+            rotate(0deg);
+    }
+
+    to {
+        transform:
+            rotate(360deg);
+    }
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+.footer {
+
+    text-align: center;
+
+    color: #455a64;
+
+    font-size: 11px;
+
+    margin-top: 30px;
+
+    letter-spacing: 2px;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 750px) {
+
+    .controls {
+
+        grid-template-columns:
+            1fr 1fr;
+    }
+
+    .controls input {
+
+        grid-column:
+            1 / -1;
+    }
+
+    select {
+
+        max-width: none;
+    }
+
+    .user,
+    .bot {
+
+        max-width: 95%;
+    }
 }
 
 </style>
@@ -3459,29 +3358,65 @@ button:disabled {
 
 <body>
 
+
 <div class="container">
 
 
-<h1>🤖 JARVIS</h1>
+<!-- =====================================================
+     HEADER
+     ===================================================== -->
 
+<div class="header">
 
-<div class="subtitle">
-    Локальный AI-помощник
+    <div class="robot">
+        🤖
+    </div>
+
+    <h1>
+        JARVIS
+    </h1>
+
+    <div class="subtitle">
+        Artificial Intelligence System
+    </div>
+
+    <div class="reactor"></div>
+
 </div>
 
 
+<!-- =====================================================
+     STATUS
+     ===================================================== -->
+
+<div class="status-panel">
+
+    <span class="status-dot"></span>
+
+    <span id="status">
+        SYSTEM ONLINE
+    </span>
+
+</div>
+
+
+<!-- =====================================================
+     CONTROLS
+     ===================================================== -->
+
 <div class="controls">
+
 
 <input
     id="text"
     type="text"
-    placeholder="Напиши команду..."
+    placeholder="Напиши команду или задай вопрос..."
     autocomplete="off"
 >
 
 
 <button id="send">
-    Отправить
+    ➤ SEND
 </button>
 
 
@@ -3491,32 +3426,126 @@ button:disabled {
 
 
 <button id="cameraButton">
-    📷 Камера
+    📷
 </button>
+
 
 </div>
 
 
-<div id="status"></div>
+<!-- =====================================================
+     LANGUAGE
+     ===================================================== -->
 
+<div class="language-panel">
+
+    <span>
+        🎤 Язык микрофона:
+    </span>
+
+    <select id="speechLanguage">
+
+        <option value="auto">
+            Авто
+        </option>
+
+        <option value="ru-RU">
+            Русский
+        </option>
+
+        <option value="en-US">
+            English
+        </option>
+
+        <option value="kk-KZ">
+            Қазақша
+        </option>
+
+        <option value="uk-UA">
+            Українська
+        </option>
+
+        <option value="de-DE">
+            Deutsch
+        </option>
+
+        <option value="fr-FR">
+            Français
+        </option>
+
+        <option value="es-ES">
+            Español
+        </option>
+
+        <option value="it-IT">
+            Italiano
+        </option>
+
+        <option value="pt-PT">
+            Português
+        </option>
+
+        <option value="zh-CN">
+            中文
+        </option>
+
+        <option value="ja-JP">
+            日本語
+        </option>
+
+        <option value="ko-KR">
+            한국어
+        </option>
+
+        <option value="tr-TR">
+            Türkçe
+        </option>
+
+        <option value="ar-SA">
+            العربية
+        </option>
+
+        <option value="hi-IN">
+            हिन्दी
+        </option>
+
+    </select>
+
+</div>
+
+
+<!-- =====================================================
+     CHAT
+     ===================================================== -->
 
 <div id="chat"></div>
 
+
+<!-- =====================================================
+     CAMERA
+     ===================================================== -->
 
 <div
     id="cameraContainer"
     class="camera"
 >
 
-<div class="camera-title">
-    Камера JARVIS
+    <div class="camera-title">
+        ◉ JARVIS VISION SYSTEM
+    </div>
+
+    <img
+        id="cameraImage"
+        src="/camera"
+        alt="JARVIS Camera"
+    >
+
 </div>
 
-<img
-    id="cameraImage"
-    src="/camera"
-    alt="Camera"
-/>
+
+<div class="footer">
+
+    JARVIS AI • LOCAL CONTROL SYSTEM
 
 </div>
 
@@ -3561,6 +3590,12 @@ const cameraButton =
     );
 
 
+const languageSelect =
+    document.getElementById(
+        "speechLanguage"
+    );
+
+
 // ========================================================
 // ESCAPE HTML
 // ========================================================
@@ -3593,7 +3628,7 @@ function addMessage(
 
         <div class="message ${type}">
 
-            <b>${name}:</b>
+            <b>${escapeHtml(name)}</b>
 
             ${escapeHtml(text)}
 
@@ -3601,11 +3636,333 @@ function addMessage(
 
     `;
 
-
     window.scrollTo(
         0,
         document.body.scrollHeight
     );
+}
+
+
+// ========================================================
+// LANGUAGE DETECTION FOR TTS
+// ========================================================
+
+function detectLanguage(text) {
+
+    if (!text) {
+        return "ru-RU";
+    }
+
+
+    // Cyrillic
+    if (/[А-Яа-яЁё]/.test(text)) {
+
+        if (/[ӘәҒғҚқҢңӨөҰұҮүІі]/.test(text)) {
+            return "kk-KZ";
+        }
+
+        if (/[ЇїІіЄєҐґ]/.test(text)) {
+            return "uk-UA";
+        }
+
+        return "ru-RU";
+    }
+
+
+    // Arabic
+    if (/[\u0600-\u06FF]/.test(text)) {
+        return "ar-SA";
+    }
+
+
+    // Chinese
+    if (/[\u4E00-\u9FFF]/.test(text)) {
+        return "zh-CN";
+    }
+
+
+    // Japanese
+    if (/[\u3040-\u30FF]/.test(text)) {
+        return "ja-JP";
+    }
+
+
+    // Korean
+    if (/[\uAC00-\uD7AF]/.test(text)) {
+        return "ko-KR";
+    }
+
+
+    // Hindi
+    if (/[\u0900-\u097F]/.test(text)) {
+        return "hi-IN";
+    }
+
+
+    // Greek
+    if (/[\u0370-\u03FF]/.test(text)) {
+        return "el-GR";
+    }
+
+
+    // Hebrew
+    if (/[\u0590-\u05FF]/.test(text)) {
+        return "he-IL";
+    }
+
+
+    // Latin languages:
+    // Browser voice selection will choose the closest voice.
+
+    return "en-US";
+}
+
+
+// ========================================================
+// SPEECH SYNTHESIS
+// ========================================================
+
+let availableVoices = [];
+
+
+function loadVoices() {
+
+    if (!("speechSynthesis" in window)) {
+        return;
+    }
+
+    availableVoices =
+        speechSynthesis.getVoices();
+
+    console.log(
+        "Доступные голоса:",
+        availableVoices
+    );
+}
+
+
+if ("speechSynthesis" in window) {
+
+    loadVoices();
+
+    speechSynthesis.onvoiceschanged =
+        loadVoices;
+}
+
+
+function detectLanguage(text) {
+
+    if (!text) {
+        return "ru-RU";
+    }
+
+
+    if (/[А-Яа-яЁё]/.test(text)) {
+
+        if (
+            /[ӘәҒғҚқҢңӨөҰұҮүІі]/.test(text)
+        ) {
+            return "kk-KZ";
+        }
+
+        if (
+            /[ЇїІіЄєҐґ]/.test(text)
+        ) {
+            return "uk-UA";
+        }
+
+        return "ru-RU";
+    }
+
+
+    if (/[\u0600-\u06FF]/.test(text)) {
+        return "ar-SA";
+    }
+
+
+    if (/[\u4E00-\u9FFF]/.test(text)) {
+        return "zh-CN";
+    }
+
+
+    if (/[\u3040-\u30FF]/.test(text)) {
+        return "ja-JP";
+    }
+
+
+    if (/[\uAC00-\uD7AF]/.test(text)) {
+        return "ko-KR";
+    }
+
+
+    if (/[\u0900-\u097F]/.test(text)) {
+        return "hi-IN";
+    }
+
+
+    return "en-US";
+}
+
+
+function speak(text) {
+
+    if (!("speechSynthesis" in window)) {
+
+        console.error(
+            "Speech Synthesis не поддерживается."
+        );
+
+        return;
+    }
+
+
+    if (!text || !text.trim()) {
+        return;
+    }
+
+
+    console.log(
+        "JARVIS говорит:",
+        text
+    );
+
+
+    speechSynthesis.cancel();
+
+
+    const lang =
+        detectLanguage(text);
+
+
+    const utterance =
+        new SpeechSynthesisUtterance(
+            text
+        );
+
+
+    utterance.lang =
+        lang;
+
+
+    utterance.rate =
+        0.95;
+
+
+    utterance.pitch =
+        1.0;
+
+
+    // Обновляем список голосов
+    loadVoices();
+
+
+    const languageCode =
+        lang
+            .toLowerCase()
+            .split("-")[0];
+
+
+    let voice =
+        availableVoices.find(
+            v =>
+                v.lang &&
+                v.lang
+                    .toLowerCase()
+                    .startsWith(
+                        languageCode
+                    )
+        );
+
+
+    // Если русского голоса нет,
+    // пробуем любой доступный голос
+    if (!voice) {
+
+        voice =
+            availableVoices.find(
+                v =>
+                    v.lang &&
+                    v.lang
+                        .toLowerCase()
+                        .startsWith("ru")
+            );
+    }
+
+
+    if (voice) {
+
+        console.log(
+            "Выбран голос:",
+            voice.name,
+            voice.lang
+        );
+
+        utterance.voice =
+            voice;
+
+    } else {
+
+        console.warn(
+            "Русский голос не найден."
+        );
+    }
+
+
+    utterance.onstart =
+        function() {
+
+            console.log(
+                "JARVIS начал говорить"
+            );
+
+            status.innerText =
+                "🔊 JARVIS SPEAKING...";
+        };
+
+
+    utterance.onend =
+        function() {
+
+            console.log(
+                "JARVIS закончил говорить"
+            );
+
+            status.innerText =
+                "SYSTEM ONLINE";
+        };
+
+
+    utterance.onerror =
+        function(event) {
+
+            console.error(
+                "Ошибка TTS:",
+                event
+            );
+
+            status.innerText =
+                "❌ TTS ERROR";
+        };
+
+
+    speechSynthesis.speak(
+        utterance
+    );
+}
+
+
+// ========================================================
+// LOAD VOICES
+// ========================================================
+
+if ("speechSynthesis" in window) {
+
+    speechSynthesis.onvoiceschanged =
+        function() {
+
+            speechSynthesis.getVoices();
+
+        };
 }
 
 
@@ -3620,14 +3977,13 @@ async function sendMessage() {
 
 
     if (!text) {
-
         return;
     }
 
 
     addMessage(
         "user",
-        "Вы",
+        "YOU",
         text
     );
 
@@ -3636,7 +3992,7 @@ async function sendMessage() {
 
 
     status.innerText =
-        "🤖 Jarvis думает...";
+        "◉ JARVIS THINKING...";
 
 
     try {
@@ -3677,10 +4033,6 @@ async function sendMessage() {
             await response.json();
 
 
-        status.innerText =
-            "";
-
-
         const answer =
             data.answer ||
             "Нет ответа.";
@@ -3688,32 +4040,33 @@ async function sendMessage() {
 
         addMessage(
             "bot",
-            "Jarvis",
+            "JARVIS",
             answer
         );
 
 
-        speak(
-            answer
-        );
+        status.innerText =
+            "SYSTEM ONLINE";
+
+
+        // Автоматически говорит ответ
+        speak(answer);
 
 
     }
 
     catch (error) {
 
-        console.error(
-            error
-        );
+        console.error(error);
 
 
         status.innerText =
-            "❌ Ошибка";
+            "❌ SYSTEM ERROR";
 
 
         addMessage(
             "bot",
-            "Jarvis",
+            "JARVIS",
             "Ошибка соединения: " +
             error.message
         );
@@ -3728,9 +4081,7 @@ async function sendMessage() {
 // ========================================================
 
 document
-    .getElementById(
-        "send"
-    )
+    .getElementById("send")
     .addEventListener(
         "click",
         sendMessage
@@ -3742,14 +4093,11 @@ document
 // ========================================================
 
 input.addEventListener(
-
     "keydown",
-
     function(event) {
 
         if (
-            event.key ===
-            "Enter"
+            event.key === "Enter"
         ) {
 
             sendMessage();
@@ -3757,12 +4105,11 @@ input.addEventListener(
         }
 
     }
-
 );
 
 
 // ========================================================
-// MICROPHONE
+// SPEECH RECOGNITION
 // ========================================================
 
 const SpeechRecognition =
@@ -3779,10 +4126,6 @@ if (SpeechRecognition) {
         new SpeechRecognition();
 
 
-    recognition.lang =
-        "ru-RU";
-
-
     recognition.continuous =
         false;
 
@@ -3795,7 +4138,7 @@ if (SpeechRecognition) {
         function() {
 
             status.innerText =
-                "🎤 Слушаю...";
+                "🎤 JARVIS LISTENING...";
 
         };
 
@@ -3827,7 +4170,7 @@ if (SpeechRecognition) {
 
 
             status.innerText =
-                "❌ Ошибка микрофона";
+                "❌ MICROPHONE ERROR";
 
         };
 
@@ -3835,35 +4178,48 @@ if (SpeechRecognition) {
     recognition.onend =
         function() {
 
-            setTimeout(
-                function() {
+            if (
+                status.innerText ===
+                "🎤 JARVIS LISTENING..."
+            ) {
 
-                    if (
-                        status.innerText ===
-                        "🎤 Слушаю..."
-                    ) {
+                status.innerText =
+                    "SYSTEM ONLINE";
 
-                        status.innerText =
-                            "";
-
-                    }
-
-                },
-                500
-            );
+            }
 
         };
 
 
     document
-        .getElementById(
-            "mic"
-        )
+        .getElementById("mic")
         .addEventListener(
             "click",
             function() {
 
                 try {
+
+                    const selected =
+                        languageSelect.value;
+
+
+                    if (
+                        selected === "auto"
+                    ) {
+
+                        recognition.lang =
+                            navigator.language ||
+                            "en-US";
+
+                    }
+
+                    else {
+
+                        recognition.lang =
+                            selected;
+
+                    }
+
 
                     recognition.start();
 
@@ -3885,23 +4241,21 @@ if (SpeechRecognition) {
 else {
 
     document
-        .getElementById(
-            "mic"
-        )
-        .disabled =
-        true;
+        .getElementById("mic")
+        .disabled = true;
+
+    status.innerText =
+        "Speech Recognition недоступен в этом браузере";
 
 }
 
 
 // ========================================================
-// CAMERA BUTTON
+// CAMERA
 // ========================================================
 
 cameraButton.addEventListener(
-
     "click",
-
     async function() {
 
         try {
@@ -3937,7 +4291,11 @@ cameraButton.addEventListener(
 
                 addMessage(
                     "bot",
-                    "Jarvis",
+                    "JARVIS",
+                    data.answer
+                );
+
+                speak(
                     data.answer
                 );
 
@@ -3962,57 +4320,32 @@ cameraButton.addEventListener(
         }
 
     }
-
 );
 
 
 // ========================================================
-// TEXT TO SPEECH
+// INITIAL MESSAGE
 // ========================================================
 
-function speak(text) {
+window.addEventListener(
+    "load",
+    function() {
 
-    if (
-        !("speechSynthesis" in window)
-    ) {
+        setTimeout(
+            function() {
 
-        return;
-    }
+                addMessage(
+                    "bot",
+                    "JARVIS",
+                    "Система JARVIS активна. Готов к работе."
+                );
 
-
-    if (!text) {
-
-        return;
-    }
-
-
-    speechSynthesis.cancel();
-
-
-    const utterance =
-        new SpeechSynthesisUtterance(
-            text
+            },
+            300
         );
 
-
-    utterance.lang =
-        "ru-RU";
-
-
-    utterance.rate =
-        1;
-
-
-    utterance.pitch =
-        1;
-
-
-    speechSynthesis.speak(
-        utterance
-    );
-
-}
-
+    }
+);
 
 </script>
 
@@ -4031,15 +4364,12 @@ function speak(text) {
 @app.on_event("shutdown")
 def shutdown_event():
 
-    print(
-        "Остановка JARVIS..."
-    )
+    print()
+    print("Остановка JARVIS...")
 
     release_camera()
 
-    print(
-        "JARVIS остановлен."
-    )
+    print("JARVIS остановлен.")
 
 
 # ============================================================
@@ -4050,28 +4380,21 @@ if __name__ == "__main__":
 
     import uvicorn
 
-
     print()
-    print("=" * 60)
-    print("JARVIS STARTING")
-    print("=" * 60)
+    print("=" * 70)
+    print("🤖 JARVIS AI STARTING")
+    print("=" * 70)
     print()
-    print(
-        "Адрес:"
-    )
-    print(
-        "http://127.0.0.1:9013"
-    )
+    print("Адрес:")
+    print("http://127.0.0.1:9013")
     print()
-
+    print("Открой этот адрес в браузере.")
+    print("=" * 70)
+    print()
 
     uvicorn.run(
-
         app,
-
         host="127.0.0.1",
-
         port=9013,
-
         reload=False
     )
