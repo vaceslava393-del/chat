@@ -3644,7 +3644,37 @@ function addMessage(
 
 
 // ========================================================
-// LANGUAGE DETECTION FOR TTS
+// TEXT TO SPEECH
+// ========================================================
+
+let availableVoices = [];
+
+function loadVoices() {
+    if (!("speechSynthesis" in window)) {
+        return [];
+    }
+
+    availableVoices = speechSynthesis.getVoices();
+
+    console.log(
+        "Доступные голоса:",
+        availableVoices.map(v => `${v.name} (${v.lang})`)
+    );
+
+    return availableVoices;
+}
+
+if ("speechSynthesis" in window) {
+    loadVoices();
+
+    speechSynthesis.onvoiceschanged = function () {
+        loadVoices();
+    };
+}
+
+
+// ========================================================
+// LANGUAGE DETECTION
 // ========================================================
 
 function detectLanguage(text) {
@@ -3653,185 +3683,141 @@ function detectLanguage(text) {
         return "ru-RU";
     }
 
-
-    // Cyrillic
-    if (/[А-Яа-яЁё]/.test(text)) {
-
-        if (/[ӘәҒғҚқҢңӨөҰұҮүІі]/.test(text)) {
-            return "kk-KZ";
-        }
-
-        if (/[ЇїІіЄєҐґ]/.test(text)) {
-            return "uk-UA";
-        }
-
-        return "ru-RU";
+    // Казахский
+    if (/[ӘәҒғҚқҢңӨөҰұҮүҺһІі]/.test(text)) {
+        return "kk-KZ";
     }
 
+    // Украинский
+    if (/[ЇїЄєҐґ]/.test(text)) {
+        return "uk-UA";
+    }
+
+    // Русский
+    if (/[А-Яа-яЁё]/.test(text)) {
+        return "ru-RU";
+    }
 
     // Arabic
     if (/[\u0600-\u06FF]/.test(text)) {
         return "ar-SA";
     }
 
-
     // Chinese
     if (/[\u4E00-\u9FFF]/.test(text)) {
         return "zh-CN";
     }
-
 
     // Japanese
     if (/[\u3040-\u30FF]/.test(text)) {
         return "ja-JP";
     }
 
-
     // Korean
     if (/[\uAC00-\uD7AF]/.test(text)) {
         return "ko-KR";
     }
-
 
     // Hindi
     if (/[\u0900-\u097F]/.test(text)) {
         return "hi-IN";
     }
 
-
-    // Greek
-    if (/[\u0370-\u03FF]/.test(text)) {
-        return "el-GR";
-    }
-
-
-    // Hebrew
-    if (/[\u0590-\u05FF]/.test(text)) {
-        return "he-IL";
-    }
-
-
-    // Latin languages:
-    // Browser voice selection will choose the closest voice.
-
+    // English / Latin
     return "en-US";
 }
 
 
 // ========================================================
-// SPEECH SYNTHESIS
+// FIND BEST VOICE
 // ========================================================
 
-let availableVoices = [];
-
-
-function loadVoices() {
-
-    if (!("speechSynthesis" in window)) {
-        return;
-    }
-
-    availableVoices =
-        speechSynthesis.getVoices();
-
-    console.log(
-        "Доступные голоса:",
-        availableVoices
-    );
-}
-
-
-if ("speechSynthesis" in window) {
+function findVoice(lang) {
 
     loadVoices();
 
-    speechSynthesis.onvoiceschanged =
-        loadVoices;
-}
-
-
-function detectLanguage(text) {
-
-    if (!text) {
-        return "ru-RU";
+    if (!availableVoices.length) {
+        return null;
     }
 
-
-    if (/[А-Яа-яЁё]/.test(text)) {
-
-        if (
-            /[ӘәҒғҚқҢңӨөҰұҮүІі]/.test(text)
-        ) {
-            return "kk-KZ";
-        }
-
-        if (
-            /[ЇїІіЄєҐґ]/.test(text)
-        ) {
-            return "uk-UA";
-        }
-
-        return "ru-RU";
-    }
+    const languageCode =
+        lang.toLowerCase().split("-")[0];
 
 
-    if (/[\u0600-\u06FF]/.test(text)) {
-        return "ar-SA";
-    }
-
-
-    if (/[\u4E00-\u9FFF]/.test(text)) {
-        return "zh-CN";
-    }
-
-
-    if (/[\u3040-\u30FF]/.test(text)) {
-        return "ja-JP";
-    }
-
-
-    if (/[\uAC00-\uD7AF]/.test(text)) {
-        return "ko-KR";
-    }
-
-
-    if (/[\u0900-\u097F]/.test(text)) {
-        return "hi-IN";
-    }
-
-
-    return "en-US";
-}
-
-
-function speak(text) {
-
-    if (!("speechSynthesis" in window)) {
-
-        console.error(
-            "Speech Synthesis не поддерживается."
+    // 1. Точное совпадение
+    let voice =
+        availableVoices.find(
+            v =>
+                v.lang &&
+                v.lang.toLowerCase() ===
+                lang.toLowerCase()
         );
 
-        return;
+    if (voice) {
+        return voice;
     }
 
+
+    // 2. Совпадение языка
+    voice =
+        availableVoices.find(
+            v =>
+                v.lang &&
+                v.lang.toLowerCase().startsWith(
+                    languageCode
+                )
+        );
+
+    if (voice) {
+        return voice;
+    }
+
+
+    return null;
+}
+
+
+// ========================================================
+// SPEAK
+// ========================================================
+
+function speak(text) {
 
     if (!text || !text.trim()) {
         return;
     }
 
+    if (!("speechSynthesis" in window)) {
+
+        console.error(
+            "Браузер не поддерживает Speech Synthesis."
+        );
+
+        status.innerText =
+            "❌ TTS НЕ ПОДДЕРЖИВАЕТСЯ";
+
+        return;
+    }
+
 
     console.log(
-        "JARVIS говорит:",
+        "JARVIS TTS:",
         text
     );
 
 
-    speechSynthesis.cancel();
-
-
     const lang =
         detectLanguage(text);
+
+
+    console.log(
+        "Язык:",
+        lang
+    );
+
+
+    // Останавливаем предыдущую речь
+    speechSynthesis.cancel();
 
 
     const utterance =
@@ -3843,53 +3829,24 @@ function speak(text) {
     utterance.lang =
         lang;
 
-
     utterance.rate =
         0.95;
-
 
     utterance.pitch =
         1.0;
 
-
-    // Обновляем список голосов
-    loadVoices();
-
-
-    const languageCode =
-        lang
-            .toLowerCase()
-            .split("-")[0];
+    utterance.volume =
+        1.0;
 
 
-    let voice =
-        availableVoices.find(
-            v =>
-                v.lang &&
-                v.lang
-                    .toLowerCase()
-                    .startsWith(
-                        languageCode
-                    )
-        );
-
-
-    // Если русского голоса нет,
-    // пробуем любой доступный голос
-    if (!voice) {
-
-        voice =
-            availableVoices.find(
-                v =>
-                    v.lang &&
-                    v.lang
-                        .toLowerCase()
-                        .startsWith("ru")
-            );
-    }
+    const voice =
+        findVoice(lang);
 
 
     if (voice) {
+
+        utterance.voice =
+            voice;
 
         console.log(
             "Выбран голос:",
@@ -3897,22 +3854,22 @@ function speak(text) {
             voice.lang
         );
 
-        utterance.voice =
-            voice;
-
     } else {
 
         console.warn(
-            "Русский голос не найден."
+            "Голос для",
+            lang,
+            "не найден. Используется голос браузера."
         );
+
     }
 
 
     utterance.onstart =
-        function() {
+        function () {
 
             console.log(
-                "JARVIS начал говорить"
+                "🔊 JARVIS начал говорить"
             );
 
             status.innerText =
@@ -3921,10 +3878,10 @@ function speak(text) {
 
 
     utterance.onend =
-        function() {
+        function () {
 
             console.log(
-                "JARVIS закончил говорить"
+                "🔊 JARVIS закончил говорить"
             );
 
             status.innerText =
@@ -3933,22 +3890,34 @@ function speak(text) {
 
 
     utterance.onerror =
-        function(event) {
+        function (event) {
 
             console.error(
-                "Ошибка TTS:",
+                "TTS ERROR:",
+                event.error,
                 event
             );
 
             status.innerText =
-                "❌ TTS ERROR";
+                "❌ TTS ERROR: " +
+                event.error;
         };
 
 
-    speechSynthesis.speak(
-        utterance
+    // Небольшая задержка помогает Chrome/Edge
+    // корректно начать озвучку после fetch()
+    setTimeout(
+        function () {
+
+            speechSynthesis.speak(
+                utterance
+            );
+
+        },
+        100
     );
 }
+
 
 
 // ========================================================
@@ -4119,6 +4088,8 @@ const SpeechRecognition =
 
 let recognition = null;
 
+let isListening = false;
+
 
 if (SpeechRecognition) {
 
@@ -4134,60 +4105,166 @@ if (SpeechRecognition) {
         false;
 
 
+    recognition.maxAlternatives =
+        1;
+
+
     recognition.onstart =
-        function() {
+        function () {
+
+            isListening = true;
 
             status.innerText =
                 "🎤 JARVIS LISTENING...";
 
+            console.log(
+                "🎤 Микрофон запущен"
+            );
         };
 
 
     recognition.onresult =
-        function(event) {
+        function (event) {
+
+            console.log(
+                "Speech result:",
+                event
+            );
+
+
+            if (
+                !event.results ||
+                !event.results.length
+            ) {
+                return;
+            }
+
+
+            const result =
+                event.results[
+                    event.results.length - 1
+                ];
+
+
+            if (!result || !result[0]) {
+                return;
+            }
+
 
             const text =
-                event
-                    .results[0][0]
-                    .transcript;
+                result[0]
+                    .transcript
+                    .trim();
+
+
+            console.log(
+                "🎤 Распознано:",
+                text
+            );
+
+
+            if (!text) {
+                return;
+            }
 
 
             input.value =
                 text;
 
 
+            // Отправляем распознанный текст
             sendMessage();
-
         };
 
 
     recognition.onerror =
-        function(event) {
+        function (event) {
 
             console.error(
+                "MIC ERROR:",
                 event.error
             );
 
 
-            status.innerText =
-                "❌ MICROPHONE ERROR";
+            isListening = false;
 
+
+            let message =
+                "Ошибка микрофона";
+
+
+            if (
+                event.error ===
+                "not-allowed"
+            ) {
+
+                message =
+                    "Доступ к микрофону запрещён. Разреши микрофон в браузере.";
+
+            }
+
+            else if (
+                event.error ===
+                "no-speech"
+            ) {
+
+                message =
+                    "Речь не обнаружена.";
+
+            }
+
+            else if (
+                event.error ===
+                "audio-capture"
+            ) {
+
+                message =
+                    "Микрофон не найден или занят другой программой.";
+
+            }
+
+            else if (
+                event.error ===
+                "network"
+            ) {
+
+                message =
+                    "Ошибка распознавания речи. Проверь интернет.";
+
+            }
+
+
+            status.innerText =
+                "❌ " + message;
+
+
+            addMessage(
+                "bot",
+                "JARVIS",
+                message
+            );
         };
 
 
     recognition.onend =
-        function() {
+        function () {
+
+            isListening = false;
+
+            console.log(
+                "🎤 Микрофон остановлен"
+            );
+
 
             if (
-                status.innerText ===
-                "🎤 JARVIS LISTENING..."
+                status.innerText.includes(
+                    "LISTENING"
+                )
             ) {
 
                 status.innerText =
                     "SYSTEM ONLINE";
-
             }
-
         };
 
 
@@ -4195,7 +4272,20 @@ if (SpeechRecognition) {
         .getElementById("mic")
         .addEventListener(
             "click",
-            function() {
+            function () {
+
+                if (isListening) {
+
+                    try {
+                        recognition.stop();
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+
+                    return;
+                }
+
 
                 try {
 
@@ -4207,18 +4297,25 @@ if (SpeechRecognition) {
                         selected === "auto"
                     ) {
 
+                        // Для русского пользователя
+                        // лучше использовать русский,
+                        // а не navigator.language,
+                        // если браузер настроен иначе.
+
                         recognition.lang =
-                            navigator.language ||
-                            "en-US";
+                            "ru-RU";
 
-                    }
-
-                    else {
+                    } else {
 
                         recognition.lang =
                             selected;
-
                     }
+
+
+                    console.log(
+                        "🎤 Язык распознавания:",
+                        recognition.lang
+                    );
 
 
                     recognition.start();
@@ -4227,10 +4324,13 @@ if (SpeechRecognition) {
 
                 catch (error) {
 
-                    console.log(
+                    console.error(
+                        "Не удалось запустить микрофон:",
                         error
                     );
 
+                    status.innerText =
+                        "❌ MICROPHONE ERROR";
                 }
 
             }
@@ -4240,14 +4340,20 @@ if (SpeechRecognition) {
 
 else {
 
+    console.error(
+        "SpeechRecognition не поддерживается."
+    );
+
+
     document
         .getElementById("mic")
         .disabled = true;
 
-    status.innerText =
-        "Speech Recognition недоступен в этом браузере";
 
+    status.innerText =
+        "❌ Speech Recognition не поддерживается";
 }
+
 
 
 // ========================================================
@@ -4256,7 +4362,11 @@ else {
 
 cameraButton.addEventListener(
     "click",
-    async function() {
+    async function () {
+
+        status.innerText =
+            "📷 STARTING CAMERA...";
+
 
         try {
 
@@ -4264,12 +4374,9 @@ cameraButton.addEventListener(
                 await fetch(
                     "/chat",
                     {
-
-                        method:
-                            "POST",
+                        method: "POST",
 
                         headers: {
-
                             "Content-Type":
                                 "application/x-www-form-urlencoded"
                         },
@@ -4298,7 +4405,6 @@ cameraButton.addEventListener(
                 speak(
                     data.answer
                 );
-
             }
 
 
@@ -4306,21 +4412,30 @@ cameraButton.addEventListener(
                 "block";
 
 
+            status.innerText =
+                "SYSTEM ONLINE";
+
         }
 
         catch (error) {
 
             console.error(
+                "Camera error:",
                 error
             );
+
 
             cameraContainer.style.display =
                 "block";
 
+
+            status.innerText =
+                "❌ CAMERA ERROR";
         }
 
     }
 );
+
 
 
 // ========================================================
