@@ -3,4 +3,6 @@ uvicorn
 httpx
 python-multipart
 python-dotenv
-
+transformers
+torch
+gradio
