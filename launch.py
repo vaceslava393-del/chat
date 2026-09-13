@@ -1,61 +1,43 @@
 import os
-import subprocess
 import sys
 import time
 
 
 # ============================================================
-#                    НАСТРОЙКИ КОНСОЛИ
+#                    НАСТРОЙКИ
 # ============================================================
 
 CONSOLE_NAME = "GAME STATION"
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+# ============================================================
+#                    ИГРЫ
+# ============================================================
+
 GAMES = {
+
     "1": {
-        "name": "Pacman",
-        "folder": "Pacman",
-        "exe": "Pacman.exe"
+        "name": "Among Us",
+        "file": "Among Us.url"
     },
 
     "2": {
-        "name": "Among Us",
-        "folder": "AmongUs",
-        "exe": "AmongUs.exe"
+        "name": "Dizzy Two",
+        "file": "Dizzy Two (Диззи 2).lnk"
     },
 
     "3": {
-        "name": "Roblox",
-        "folder": "Roblox",
-        "exe": "Roblox.exe"
+        "name": "Counter-Strike 2",
+        "file": "Counter-Strike 2.url"
     },
 
     "4": {
-        "name": "Terraria",
-        "folder": "Terraria",
-        "exe": "Terraria.exe"
-    },
-
-    "5": {
-        "name": "Street Racing 3D",
-        "folder": "StreetRacing",
-        "exe": "StreetRacing.exe"
-    },
-
-    "6": {
-        "name": "The Dizzy",
-        "folder": "TheDizzy",
-        "exe": "TheDizzy.exe"
+        "name": "The Backrooms",
+        "file": "The Backrooms Game FREE Edition.lnk"
     }
 }
-
-
-# ============================================================
-#                    ПУТЬ К ПРОЕКТУ
-# ============================================================
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-GAMES_DIR = os.path.join(BASE_DIR, "games")
 
 
 # ============================================================
@@ -63,6 +45,7 @@ GAMES_DIR = os.path.join(BASE_DIR, "games")
 # ============================================================
 
 def clear_screen():
+
     os.system("cls" if os.name == "nt" else "clear")
 
 
@@ -71,6 +54,7 @@ def clear_screen():
 # ============================================================
 
 def pause():
+
     input("\nНажми Enter для продолжения...")
 
 
@@ -84,30 +68,26 @@ def show_header():
     print()
     print("                    🎮 GAME STATION")
     print()
-    print("              PC GAME LAUNCHER")
+    print("                   PC GAME LAUNCHER")
     print()
     print("=" * 70)
     print()
 
 
 # ============================================================
-#                    ПРОВЕРКА ИГРЫ
+#                    ПУТЬ К ИГРЕ
 # ============================================================
 
 def get_game_path(game):
 
-    folder = game["folder"]
-    exe = game["exe"]
-
-    game_folder = os.path.join(GAMES_DIR, folder)
-
-    game_exe = os.path.join(game_folder, exe)
-
-    return game_exe
+    return os.path.join(
+        BASE_DIR,
+        game["file"]
+    )
 
 
 # ============================================================
-#                    СТАТУС ИГРЫ
+#                    ПРОВЕРКА ИГРЫ
 # ============================================================
 
 def game_status(game):
@@ -134,13 +114,14 @@ def show_games():
         status = game_status(game)
 
         print(
-            f"  [{number}] 🎮 {game['name']:<25} {status}"
+            f"  [{number}] 🎮 {game['name']:<30} {status}"
         )
 
     print("-" * 70)
 
     print()
     print("  [R] 🔄 Обновить список")
+    print("  [I] ℹ️  Информация")
     print("  [0] 🚪 Выход")
     print()
 
@@ -160,70 +141,77 @@ def launch_game(game):
 
     game_path = get_game_path(game)
 
-    print("Проверка файла...")
+    print("Проверка ярлыка...")
     print()
+
+    # --------------------------------------------------------
+    # ЯРЛЫК НЕ НАЙДЕН
+    # --------------------------------------------------------
 
     if not os.path.isfile(game_path):
 
         print("❌ ОШИБКА")
         print()
-        print("Файл игры не найден.")
+
+        print("Ярлык игры не найден:")
+
         print()
-        print("Программа ищет:")
         print(game_path)
-        print()
-
-        print("Создай папку:")
-
-        print(
-            os.path.join(
-                GAMES_DIR,
-                game["folder"]
-            )
-        )
 
         print()
 
-        print("И положи туда файл:")
-
-        print(game["exe"])
+        print("Убедись, что файл находится")
+        print("в той же папке, что и launch.py.")
 
         pause()
 
         return
 
-    print("Файл найден!")
+    # --------------------------------------------------------
+    # ЯРЛЫК НАЙДЕН
+    # --------------------------------------------------------
+
+    print("✅ Ярлык найден!")
     print()
+
+    print("Файл:")
+
+    print(game["file"])
+
+    print()
+
     print("🚀 Запуск игры...")
     print()
 
     try:
 
-        # Запуск EXE
-        subprocess.Popen(
-            [game_path],
-            cwd=os.path.dirname(game_path)
-        )
+        # Windows открывает .lnk и .url
+        os.startfile(game_path)
 
         print("=" * 70)
         print()
         print("             ✅ ИГРА УСПЕШНО ЗАПУЩЕНА!")
         print()
-        print(f"             {game['name']}")
+        print(f"                  {game['name']}")
         print()
         print("=" * 70)
 
         time.sleep(2)
 
-        input("\nНажми Enter, чтобы вернуться в меню...")
+        input(
+            "\nНажми Enter, чтобы вернуться в меню..."
+        )
 
     except Exception as error:
 
         print()
-        print("❌ НЕ УДАЛОСЬ ЗАПУСТИТЬ ИГРУ")
+        print("❌ НЕ УДАЛОСЬ ОТКРЫТЬ ИГРУ")
         print()
+
         print("Ошибка:")
         print(error)
+
+        print()
 
         pause()
 
@@ -241,16 +229,31 @@ def show_info():
     print("                         INFO")
     print("-" * 70)
     print()
+
     print("🎮 GAME STATION")
     print()
-    print("Это консольный лаунчер для запуска")
-    print("игр с помощью .exe файлов.")
+
+    print("Этот лаунчер открывает ярлыки")
+    print("игр формата .lnk и .url.")
     print()
-    print("Игры должны находиться внутри папки:")
+
+    print("Файлы должны находиться")
+    print("в той же папке, что и launch.py.")
     print()
-    print("games/")
+
+    print("Поддерживаются:")
+
     print()
-    print("Каждая игра должна иметь свою папку.")
+    print("  • .lnk — ярлык Windows")
+    print("  • .url — интернет/Steam ярлык")
+
+    print()
+
+    print("Текущая папка:")
+
+    print()
+    print(BASE_DIR)
+
     print()
     print("-" * 70)
 
@@ -258,7 +261,7 @@ def show_info():
 
 
 # ============================================================
-#                    АНИМАЦИЯ ЗАПУСКА
+#                    АНИМАЦИЯ
 # ============================================================
 
 def startup_animation():
@@ -268,7 +271,7 @@ def startup_animation():
     print()
     print("=" * 70)
     print()
-    print("                    GAME STATION")
+    print("                    🎮 GAME STATION")
     print()
     print("=" * 70)
     print()
@@ -315,9 +318,9 @@ def main():
             print()
             print("=" * 70)
             print()
-            print("                  GAME STATION")
+            print("                    GAME STATION")
             print()
-            print("              Спасибо за игру! 🎮")
+            print("                Спасибо за игру! 🎮")
             print()
             print("=" * 70)
             print()
@@ -353,7 +356,9 @@ def main():
 
         elif choice in GAMES:
 
-            launch_game(GAMES[choice])
+            launch_game(
+                GAMES[choice]
+            )
 
         # ----------------------------------------------------
         # ОШИБКА
@@ -368,7 +373,7 @@ def main():
 
 
 # ============================================================
-#                    ЗАПУСК ПРОГРАММЫ
+#                    ЗАПУСК
 # ============================================================
 
 if __name__ == "__main__":
@@ -382,6 +387,11 @@ if __name__ == "__main__":
         clear_screen()
 
         print()
-        print("Программа закрыта.")
+        print("=" * 70)
+        print()
+        print("              Программа закрыта.")
+        print()
+        print("=" * 70)
+        print()
 
         sys.exit()
