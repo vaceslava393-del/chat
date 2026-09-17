@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+
+<html lang="ru">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0">
+
+<title>🎵 Game Music Dance</title>
+
+
+<style>
+
+/* =========================================================
+   ОСНОВА
+   ========================================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+
+body {
+
+    margin: 0;
+
+    min-height: 100vh;
+
+    font-family: Arial, sans-serif;
+
+    color: white;
+
+    background:
+        radial-gradient(
+            circle at top,
+            #293867,
+            #090b13 65%
+        );
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+header {
+
+    text-align: center;
+
+    padding: 30px 15px 20px;
+}
+
+
+header h1 {
+
+    margin: 0;
+
+    font-size: 42px;
+}
+
+
+.subtitle {
+
+    margin-top: 10px;
+
+    color: #aeb7d5;
+
+    font-size: 17px;
+}
+
+
+/* =========================================================
+   КОНТЕЙНЕР
+   ========================================================= */
+
+.container {
+
+    width: min(1200px, 94%);
+
+    margin: auto;
+}
+
+
+/* =========================================================
+   ПОИСК
+   ========================================================= */
+
+.search {
+
+    display: flex;
+
+    gap: 10px;
+
+    margin: 20px 0;
+}
+
+
+#searchInput {
+
+    flex: 1;
+
+    padding: 17px;
+
+    border: 2px solid #303853;
+
+    border-radius: 14px;
+
+    background: #131725;
+
+    color: white;
+
+    outline: none;
+
+    font-size: 17px;
+}
+
+
+#searchInput:focus {
+
+    border-color: #6875ff;
+}
+
+
+.search button {
+
+    padding: 0 25px;
+
+    border: none;
+
+    border-radius: 14px;
+
+    background: #5865f2;
+
+    color: white;
+
+    font-size: 16px;
+
+    cursor: pointer;
+}
+
+
+.search button:hover {
+
+    filter: brightness(1.15);
+}
+
+
+/* =========================================================
+   PLAYER
+   ========================================================= */
+
+.player-box {
+
+    display: none;
+
+    margin: 20px 0;
+
+    padding: 20px;
+
+    background: #131725;
+
+    border-radius: 20px;
+}
+
+
+.player-box.show {
+
+    display: block;
+}
+
+
+#player {
+
+    width: 100%;
+
+    min-height: 400px;
+
+    border-radius: 15px;
+
+    overflow: hidden;
+}
+
+
+.now-playing {
+
+    margin-top: 15px;
+
+    text-align: center;
+
+    font-size: 18px;
+
+    color: #8fffaf;
+}
+
+
+/* =========================================================
+   РЕЗУЛЬТАТЫ
+   ========================================================= */
+
+.results {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fill,
+            minmax(230px, 1fr)
+        );
+
+    gap: 15px;
+
+    margin-top: 20px;
+}
+
+
+.result {
+
+    background: #171c2c;
+
+    border: 1px solid #303752;
+
+    border-radius: 16px;
+
+    overflow: hidden;
+
+    transition: 0.2s;
+}
+
+
+.result:hover {
+
+    transform: translateY(-4px);
+
+    border-color: #6875ff;
+}
+
+
+.result img {
+
+    width: 100%;
+
+    display: block;
+}
+
+
+.result-content {
+
+    padding: 14px;
+}
+
+
+.result-id {
+
+    color: #8893b7;
+
+    font-size: 13px;
+
+    margin-bottom: 10px;
+}
+
+
+.play-button {
+
+    width: 100%;
+
+    padding: 12px;
+
+    border: none;
+
+    border-radius: 10px;
+
+    background: #5865f2;
+
+    color: white;
+
+    cursor: pointer;
+
+    font-size: 15px;
+}
+
+
+.youtube-button {
+
+    display: block;
+
+    text-align: center;
+
+    margin-top: 8px;
+
+    padding: 10px;
+
+    border-radius: 10px;
+
+    background: #272d43;
+
+    color: white;
+
+    text-decoration: none;
+
+    font-size: 14px;
+}
+
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+
+.status {
+
+    margin: 20px 0;
+
+    padding: 15px;
+
+    text-align: center;
+
+    border-radius: 12px;
+
+    background: #151a29;
+
+    color: #aeb7d5;
+}
+
+
+/* =========================================================
+   ПЕРСОНАЖИ
+   ========================================================= */
+
+.characters-title {
+
+    margin-top: 35px;
+}
+
+
+.characters {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(170px, 1fr)
+        );
+
+    gap: 20px;
+
+    padding-bottom: 40px;
+}
+
+
+.character {
+
+    min-height: 260px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    background:
+        linear-gradient(
+            145deg,
+            #20263d,
+            #10131e
+        );
+
+    border: 2px solid #303752;
+
+    border-radius: 20px;
+
+    overflow: hidden;
+}
+
+
+.avatar {
+
+    font-size: 90px;
+
+    height: 130px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+}
+
+
+.character-name {
+
+    font-size: 20px;
+
+    font-weight: bold;
+}
+
+
+.game-name {
+
+    margin-top: 6px;
+
+    color: #8c96b8;
+
+    font-size: 14px;
+}
+
+
+/* =========================================================
+   ТАНЕЦ
+   ========================================================= */
+
+.character.dancing .avatar {
+
+    animation:
+        dance
+        0.45s
+        infinite
+        alternate
+        ease-in-out;
+}
+
+
+.character.dancing {
+
+    animation:
+        bodyDance
+        0.9s
+        infinite
+        ease-in-out;
+}
+
+
+@keyframes dance {
+
+    0% {
+
+        transform:
+            translateY(8px)
+            rotate(-10deg)
+            scale(0.95);
+    }
+
+
+    50% {
+
+        transform:
+            translateY(-15px)
+            rotate(10deg)
+            scale(1.1);
+    }
+
+
+    100% {
+
+        transform:
+            translateY(5px)
+            rotate(-7deg)
+            scale(1);
+    }
+}
+
+
+@keyframes bodyDance {
+
+    0% {
+
+        transform:
+            translateY(0);
+    }
+
+
+    50% {
+
+        transform:
+            translateY(-7px)
+            rotate(2deg);
+    }
+
+
+    100% {
+
+        transform:
+            translateY(0);
+    }
+}
+
+
+/* =========================================================
+   LOADING
+   ========================================================= */
+
+.loading {
+
+    display: none;
+
+    text-align: center;
+
+    padding: 25px;
+
+    color: #8f9abb;
+}
+
+
+.loading.show {
+
+    display: block;
+}
+
+
+/* =========================================================
+   FOOTER
+   ========================================================= */
+
+footer {
+
+    text-align: center;
+
+    padding: 30px;
+
+    color: #626b88;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media(max-width: 650px) {
+
+    header h1 {
+
+        font-size: 30px;
+    }
+
+
+    .search {
+
+        flex-direction: column;
+    }
+
+
+    .search button {
+
+        padding: 15px;
+    }
+
+
+    #player {
+
+        min-height: 250px;
+    }
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<header>
+
+    <h1>
+        🎵 GAME MUSIC DANCE
+    </h1>
+
+    <div class="subtitle">
+
+        🔎 Найди музыку в интернете —
+        🎮 персонажи будут танцевать
+
+    </div>
+
+</header>
+
+
+<div class="container">
+
+
+    <!-- =====================================================
+         ПОИСК
+         ===================================================== -->
+
+    <div class="search">
+
+        <input
+            id="searchInput"
+            type="text"
+            placeholder="Например: Michael Jackson, Minecraft music..."
+        >
+
+        <button onclick="searchMusic()">
+
+            🔎 Найти
+
+        </button>
+
+    </div>
+
+
+    <!-- =====================================================
+         STATUS
+         ===================================================== -->
+
+    <div
+        class="status"
+        id="status"
+    >
+
+        Напиши название музыки и нажми «Найти»
+
+    </div>
+
+
+    <!-- =====================================================
+         LOADING
+         ===================================================== -->
+
+    <div
+        class="loading"
+        id="loading"
+    >
+
+        🔎 Ищем музыку в интернете...
+
+    </div>
+
+
+    <!-- =====================================================
+         РЕЗУЛЬТАТЫ
+         ===================================================== -->
+
+    <div
+        class="results"
+        id="results"
+    >
+
+    </div>
+
+
+    <!-- =====================================================
+         YOUTUBE PLAYER
+         ===================================================== -->
+
+    <div
+        class="player-box"
+        id="playerBox"
+    >
+
+        <div id="player"></div>
+
+        <div
+            class="now-playing"
+            id="nowPlaying"
+        >
+
+            🎵 Музыка
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         ПЕРСОНАЖИ
+         ===================================================== -->
+
+    <h2 class="characters-title">
+
+        🎮 Персонажи
+
+    </h2>
+
+
+    <div class="characters">
+
+
+        <div class="character">
+
+            <div class="avatar">
+                🍄
+            </div>
+
+            <div class="character-name">
+                Mario
+            </div>
+
+            <div class="game-name">
+                Super Mario
+            </div>
+
+        </div>
+
+
+        <div class="character">
+
+            <div class="avatar">
+                🦔
+            </div>
+
+            <div class="character-name">
+                Sonic
+            </div>
+
+            <div class="game-name">
+                Sonic
+            </div>
+
+        </div>
+
+
+        <div class="character">
+
+            <div class="avatar">
+                🟡
+            </div>
+
+            <div class="character-name">
+                Pac-Man
+            </div>
+
+            <div class="game-name">
+                Pac-Man
+            </div>
+
+        </div>
+
+
+        <div class="character">
+
+            <div class="avatar">
+                🧑
+            </div>
+
+            <div class="character-name">
+                Steve
+            </div>
+
+            <div class="game-name">
+                Minecraft
+            </div>
+
+        </div>
+
+
+        <div class="character">
+
+            <div class="avatar">
+                🟨
+            </div>
+
+            <div class="character-name">
+                Noob
+            </div>
+
+            <div class="game-name">
+                Roblox
+            </div>
+
+        </div>
+
+
+        <div class="character">
+
+            <div class="avatar">
+                👨‍🚀
+            </div>
+
+            <div class="character-name">
+                Crewmate
+            </div>
+
+            <div class="game-name">
+                Among Us
+            </div>
+
+        </div>
+
+
+        <div class="character">
+
+            <div class="avatar">
+                🧙
+            </div>
+
+            <div class="character-name">
+                Terraria
+            </div>
+
+            <div class="game-name">
+                Terraria
+            </div>
+
+        </div>
+
+
+        <div class="character">
+
+            <div class="avatar">
+                🕺
+            </div>
+
+            <div class="character-name">
+                Player
+            </div>
+
+            <div class="game-name">
+                Fortnite
+            </div>
+
+        </div>
+
+
+    </div>
+
+</div>
+
+
+<footer>
+
+    🎵 Game Music Dance
+
+</footer>
+
+
+<!-- =========================================================
+     YOUTUBE IFRAME API
+     ========================================================= -->
+
+<script src="https://www.youtube.com/iframe_api"></script>
+
+
+<script>
+
+/* =========================================================
+   ПЕРЕМЕННЫЕ
+   ========================================================= */
+
+let player = null;
+
+let playerReady = false;
+
+let currentVideo = null;
+
+
+const characters =
+    document.querySelectorAll(".character");
+
+
+const results =
+    document.getElementById("results");
+
+
+const status =
+    document.getElementById("status");
+
+
+const loading =
+    document.getElementById("loading");
+
+
+const playerBox =
+    document.getElementById("playerBox");
+
+
+const nowPlaying =
+    document.getElementById("nowPlaying");
+
+
+const searchInput =
+    document.getElementById("searchInput");
+
+
+/* =========================================================
+   YOUTUBE API
+   ========================================================= */
+
+function onYouTubeIframeAPIReady() {
+
+    player =
+        new YT.Player(
+            "player",
+            {
+
+                height: "400",
+
+                width: "100%",
+
+                videoId: "",
+
+                playerVars: {
+
+                    playsinline: 1,
+
+                    controls: 1,
+
+                    rel: 0
+
+                },
+
+                events: {
+
+                    onReady:
+                        onPlayerReady,
+
+                    onStateChange:
+                        onPlayerStateChange,
+
+                    onAutoplayBlocked:
+                        onAutoplayBlocked
+
+                }
+
+            }
+        );
+
+}
+
+
+function onPlayerReady() {
+
+    playerReady = true;
+
+}
+
+
+/* =========================================================
+   СОСТОЯНИЕ YOUTUBE
+   ========================================================= */
+
+function onPlayerStateChange(event) {
+
+    /*
+       1 = PLAYING
+    */
+
+    if (event.data === YT.PlayerState.PLAYING) {
+
+        startDance();
+
+        status.innerHTML =
+            "🎵 Музыка играет — " +
+            "<b>персонажи танцуют!</b> 💃🕺";
+
+    }
+
+
+    /*
+       2 = PAUSED
+    */
+
+    else if (
+        event.data === YT.PlayerState.PAUSED
+    ) {
+
+        stopDance();
+
+        status.textContent =
+            "⏸ Музыка на паузе";
+
+    }
+
+
+    /*
+       0 = ENDED
+    */
+
+    else if (
+        event.data === YT.PlayerState.ENDED
+    ) {
+
+        stopDance();
+
+        status.textContent =
+            "🎵 Музыка закончилась";
+
+    }
+
+}
+
+
+/* =========================================================
+   AUTOPLAY ЗАБЛОКИРОВАН
+   ========================================================= */
+
+function onAutoplayBlocked() {
+
+    status.textContent =
+        "▶️ Браузер заблокировал автоматический запуск. " +
+        "Нажми кнопку запуска.";
+
+    stopDance();
+
+}
+
+
+/* =========================================================
+   ПОИСК
+   ========================================================= */
+
+async function searchMusic() {
+
+    const query =
+        searchInput.value.trim();
+
+
+    if (!query) {
+
+        status.textContent =
+            "Введите название музыки.";
+
+        return;
+
+    }
+
+
+    loading.classList.add("show");
+
+    results.innerHTML = "";
+
+
+    status.textContent =
+        "🔎 Ищем: " + query;
+
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/search?q=" +
+                encodeURIComponent(query)
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            !data.success ||
+            !data.results.length
+        ) {
+
+            status.textContent =
+                "😕 Ничего не найдено.";
+
+            loading.classList.remove("show");
+
+            return;
+
+        }
+
+
+        status.textContent =
+            "🎵 Найдено: " +
+            data.results.length;
+
+
+        data.results.forEach(
+            (video, index) => {
+
+                createResult(
+                    video,
+                    index,
+                    query
+                );
+
+            }
+        );
+
+
+    } catch (error) {
+
+        console.error(error);
+
+        status.textContent =
+            "❌ Ошибка поиска.";
+
+    }
+
+
+    loading.classList.remove("show");
+
+}
+
+
+/* =========================================================
+   СОЗДАНИЕ РЕЗУЛЬТАТА
+   ========================================================= */
+
+function createResult(
+    video,
+    index,
+    query
+) {
+
+    const card =
+        document.createElement("div");
+
+
+    card.className =
+        "result";
+
+
+    card.innerHTML = `
+
+        <img
+            src="${video.thumbnail}"
+            alt="Музыка"
+        >
+
+        <div class="result-content">
+
+            <div class="result-id">
+
+                🎵 Результат ${index + 1}
+
+            </div>
+
+            <button
+                class="play-button"
+                onclick="playMusic(
+                    '${video.id}',
+                    '${escapeHtml(query)}'
+                )"
+            >
+
+                ▶️ Играть
+
+            </button>
+
+
+            <a
+                class="youtube-button"
+                href="${video.url}"
+                target="_blank"
+            >
+
+                🔗 Открыть YouTube
+
+            </a>
+
+        </div>
+    `;
+
+
+    results.appendChild(card);
+
+}
+
+
+/* =========================================================
+   ЗАПУСК МУЗЫКИ
+   ========================================================= */
+
+function playMusic(
+    videoId,
+    title
+) {
+
+    if (!playerReady) {
+
+        status.textContent =
+            "⏳ YouTube-плеер ещё загружается...";
+
+        return;
+
+    }
+
+
+    currentVideo = videoId;
+
+
+    playerBox.classList.add("show");
+
+
+    nowPlaying.innerHTML =
+        "🎵 Сейчас играет: <b>" +
+        title +
+        "</b>";
+
+
+    /*
+       Загружаем выбранное видео.
+    */
+
+    player.loadVideoById(
+        videoId
+    );
+
+
+    /*
+       Запускаем танец.
+       Если браузер разрешит autoplay —
+       музыка начнётся автоматически.
+    */
+
+    startDance();
+
+}
+
+
+/* =========================================================
+   ТАНЕЦ
+   ========================================================= */
+
+function startDance() {
+
+    characters.forEach(
+        character => {
+
+            character.classList.add(
+                "dancing"
+            );
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   ОСТАНОВКА ТАНЦА
+   ========================================================= */
+
+function stopDance() {
+
+    characters.forEach(
+        character => {
+
+            character.classList.remove(
+                "dancing"
+            );
+
+        }
+    );
+
+}
+
+
+/* =========================================================
+   ENTER
+   ========================================================= */
+
+searchInput.addEventListener(
+    "keydown",
+    function(event) {
+
+        if (event.key === "Enter") {
+
+            searchMusic();
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   ЗАЩИТА HTML
+   ========================================================= */
+
+function escapeHtml(text) {
+
+    return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+}
+
+</script>
+
+
+</body>
+
+</html>
