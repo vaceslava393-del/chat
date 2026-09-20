@@ -31,11 +31,9 @@ from faster_whisper import WhisperModel
 BASE_DIR = Path(__file__).resolve().parent
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2")
 
-# Основная локальная модель
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:1.7b")
-
-# Для слабого ноутбука:
+# Для слабого ноутбука
 # OLLAMA_MODEL = "qwen3:1.7b"
 
 
@@ -55,8 +53,7 @@ TTS_RATE = 175
 # Если False — отвечает на любую услышанную речь
 WAKE_WORD_REQUIRED = True
 
-WAKE_WORDS = [
-    "джарвис",
+WAKE_WORDS =[
     "джарвис",
     "jarvis",
 ]
