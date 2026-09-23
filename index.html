@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Game Music Dance</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background:
+                radial-gradient(
+                    circle at top,
+                    #243b55,
+                    #05070b 70%
+                );
+            color: white;
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 25px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.45);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 36px;
+        }
+
+        header p {
+            color: #aaa;
+            margin-bottom: 0;
+        }
+
+        .container {
+            width: 95%;
+            max-width: 1200px;
+            margin: auto;
+            padding: 25px 0;
+        }
+
+        .section-title {
+            margin-top: 45px;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        /* =========================
+           MUSIC SEARCH
+        ========================= */
+
+        .music-search {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        #musicSearch {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            font-size: 17px;
+            outline: none;
+        }
+
+        button {
+            border: none;
+            cursor: pointer;
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-weight: bold;
+        }
+
+        .search-button {
+            background: #00c853;
+            color: white;
+            font-size: 16px;
+        }
+
+        .search-button:hover {
+            background: #00e676;
+        }
+
+        #musicResults {
+            display: grid;
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(250px, 1fr)
+                );
+            gap: 15px;
+        }
+
+        .music-card {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .music-card img {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 10px;
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        .no-cover {
+            width: 100%;
+            height: 250px;
+            border-radius: 10px;
+            background: #20252c;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 70px;
+            margin-bottom: 12px;
+        }
+
+        .music-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .music-artist {
+            color: #aaa;
+            margin-bottom: 12px;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .deezer-link {
+            display: block;
+            margin-top: 10px;
+            color: #00e5ff;
+            text-decoration: none;
+        }
+
+        .deezer-link:hover {
+            text-decoration: underline;
+        }
+
+        /* =========================
+           CHARACTERS
+        ========================= */
+
+        #characters {
+            display: grid;
+            grid-template-columns:
+                repeat(
+                    auto-fit,
+                    minmax(180px, 1fr)
+                );
+            gap: 20px;
+        }
+
+        .character {
+            position: relative;
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(255, 255, 255, .12),
+                    rgba(255, 255, 255, .03)
+                );
+            border: 1px solid rgba(255, 255, 255, .1);
+            border-radius: 20px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition:
+                transform .25s,
+                box-shadow .25s;
+        }
+
+        .character:hover {
+            transform:
+                translateY(-8px)
+                scale(1.03);
+
+            box-shadow:
+                0 15px 40px
+                rgba(0, 0, 0, .5);
+        }
+
+        .character-image {
+            width: 100%;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .character img {
+            width: 150px;
+            height: 180px;
+            object-fit: contain;
+            display: block;
+            margin: auto;
+        }
+
+        .character-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .character-game {
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        /* =========================
+           DANCE
+        ========================= */
+
+        .character.dancing {
+            animation:
+                dance .5s
+                infinite alternate;
+        }
+
+        @keyframes dance {
+
+            from {
+                transform:
+                    rotate(-5deg)
+                    translateY(0);
+            }
+
+            to {
+                transform:
+                    rotate(5deg)
+                    translateY(-15px);
+            }
+        }
+
+        /* =========================
+           MODAL
+        ========================= */
+
+        #modal {
+            position: fixed;
+            inset: 0;
+
+            background:
+                rgba(0, 0, 0, .8);
+
+            display: none;
+
+            align-items: center;
+            justify-content: center;
+
+            padding: 20px;
+
+            z-index: 1000;
+        }
+
+        #modal.active {
+            display: flex;
+        }
+
+        .modal-box {
+            width: 100%;
+            max-width: 700px;
+            max-height: 90vh;
+
+            overflow-y: auto;
+
+            background: #121820;
+
+            border-radius: 20px;
+
+            padding: 25px;
+
+            position: relative;
+
+            box-shadow:
+                0 20px 80px
+                rgba(0, 0, 0, .7);
+        }
+
+        .close {
+            position: absolute;
+
+            top: 12px;
+            right: 15px;
+
+            background: transparent;
+
+            color: white;
+
+            font-size: 32px;
+
+            padding: 5px 10px;
+        }
+
+        .close:hover {
+            color: #ff5252;
+        }
+
+        .modal-content {
+            display: flex;
+            gap: 25px;
+            align-items: flex-start;
+        }
+
+        .modal-content img {
+            width: 200px;
+            height: 230px;
+            object-fit: contain;
+        }
+
+        .modal-info {
+            flex: 1;
+        }
+
+        .modal-info h2 {
+            margin-top: 0;
+            font-size: 30px;
+        }
+
+        .game {
+            color: #00e5ff;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+
+        .role {
+            color: #00c853;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+
+        .description {
+            line-height: 1.6;
+            color: #ddd;
+        }
+
+        .stats {
+            margin-top: 20px;
+        }
+
+        .stat {
+            margin-bottom: 12px;
+        }
+
+        .stat-name {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .bar {
+            height: 10px;
+            background: #2b3139;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .bar-inner {
+            height: 100%;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    #00c853,
+                    #00e5ff
+                );
+
+            border-radius: 20px;
+        }
+
+        .error {
+            color: #ff5252;
+            background: rgba(255, 82, 82, .1);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .loading {
+            color: #aaa;
+            padding: 15px 0;
+        }
+
+        .open-character-button {
+            width: 100%;
+            margin-top: 15px;
+            background: linear-gradient(90deg, #00c853, #00e5ff);
+            color: white;
+            font-size: 14px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform .2s, opacity .2s;
+        }
+
+        .open-character-button:hover {
+            transform: scale(1.03);
+            opacity: 0.9;
+        }
+
+        .character:focus {
+            outline: 2px solid #00e5ff;
+            outline-offset: 3px;
+        }
+
+        @media (max-width: 650px) {
+
+            .music-search {
+                flex-direction: column;
+            }
+
+            .modal-content {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+
+            .modal-info {
+                width: 100%;
+            }
+
+            header h1 {
+                font-size: 27px;
+            }
+        }
+    </style>
+</head>
+
+
+<body>
+
+<header>
+
+    <h1>
+        🎵 GAME MUSIC DANCE 🎮
+    </h1>
+
+    <p>
+        Музыка • Игры • Персонажи • Танцы
+    </p>
+
+</header>
+
+
+<div class="container">
+
+    <!-- =========================
+         MUSIC
+    ========================== -->
+
+    <h2 class="section-title">
+        🎵 Поиск музыки
+    </h2>
+
+    <div class="music-search">
+
+        <input
+            id="musicSearch"
+            type="text"
+            placeholder="Например: Michael Jackson"
+        >
+
+        <button
+            class="search-button"
+            onclick="searchMusic()"
+        >
+            🔎 Найти
+        </button>
+
+    </div>
+
+
+    <div id="musicResults"></div>
+
+
+    <!-- =========================
+         CHARACTERS
+    ========================== -->
+
+    <h2 class="section-title">
+        🎮 Игровые персонажи
+    </h2>
+
+    <div id="characters"></div>
+
+</div>
+
+
+<!-- =========================
+     MODAL
+========================== -->
+
+<div id="modal" role="dialog" aria-modal="true" aria-label="Информация о персонаже">
+
+    <div class="modal-box">
+
+        <button
+            class="close"
+            onclick="closeModal()"
+        >
+            ×
+        </button>
+
+        <div
+            id="modalContent"
+            class="modal-content"
+        ></div>
+
+    </div>
+
+</div>
+
+
+<!-- =========================
+     JAVASCRIPT
+========================== -->
+
+<script>
+
+let characters = [];
+
+let currentAudio = null;
+
+
+/* ============================================================
+   HTML SECURITY
+============================================================ */
+
+function escapeHtml(text) {
+
+    const div =
+        document.createElement("div");
+
+    div.textContent =
+        text ?? "";
+
+    return div.innerHTML;
+}
+
+
+/* ============================================================
+   MUSIC SEARCH
+============================================================ */
+
+async function searchMusic() {
+    const input = document.getElementById("musicSearch");
+    const query = input.value.trim();
+
+    if (!query) {
+        alert("Введите название музыки");
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            `/api/search?q=${encodeURIComponent(query)}`
+        );
+
+        const data = await response.json();
+
+        console.log("Ответ сервера:", data);
+
+        if (!data.success) {
+            alert(data.error || "Ошибка поиска");
+            return;
+        }
+
+        if (!data.google_url) {
+            alert("Google URL отсутствует в ответе сервера");
+            return;
+        }
+
+        window.open(data.google_url, "_blank");
+
+    } catch (error) {
+        console.error(error);
+        alert("Ошибка соединения с сервером");
+    }
+}
+
+
+/* ============================================================
+   STOP OTHER AUDIO
+============================================================ */
+
+function stopOtherAudio(
+    current
+) {
+
+    const audios =
+        document.querySelectorAll(
+            "#musicResults audio"
+        );
+
+
+    audios.forEach(
+        audio => {
+
+            if (
+                audio !== current
+            ) {
+
+                audio.pause();
+
+                audio.currentTime =
+                    0;
+            }
+
+        }
+    );
+}
+
+
+/* ============================================================
+   CHECK AUDIO
+============================================================ */
+
+function isAnyAudioPlaying() {
+
+    const audios =
+        document.querySelectorAll(
+            "#musicResults audio"
+        );
+
+
+    return Array.from(
+        audios
+    ).some(
+        audio =>
+            !audio.paused &&
+            !audio.ended
+    );
+}
+
+
+/* ============================================================
+   START DANCE
+============================================================ */
+
+function startDance() {
+
+    const cards =
+        document.querySelectorAll(
+            ".character"
+        );
+
+
+    cards.forEach(
+        card => {
+
+            card.classList.add(
+                "dancing"
+            );
+
+        }
+    );
+}
+
+
+/* ============================================================
+   STOP DANCE
+============================================================ */
+
+function stopDance() {
+
+    const cards =
+        document.querySelectorAll(
+            ".character"
+        );
+
+
+    cards.forEach(
+        card => {
+
+            card.classList.remove(
+                "dancing"
+            );
+
+        }
+    );
+}
+
+
+/* ============================================================
+   LOAD CHARACTERS
+============================================================ */
+
+async function loadCharacters() {
+
+    const container =
+        document.getElementById(
+            "characters"
+        );
+
+
+    container.innerHTML =
+        '<p class="loading">🎮 Загружаю персонажей...</p>';
+
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/characters"
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "HTTP " +
+                response.status
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            "Персонажи:",
+            data
+        );
+
+
+        if (!data.success) {
+
+            throw new Error(
+                data.error ||
+                "Ошибка загрузки персонажей"
+            );
+        }
+
+
+        characters =
+            data.characters || [];
+
+
+        renderCharacters();
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Ошибка персонажей:",
+            error
+        );
+
+
+        container.innerHTML =
+            `
+            <p class="error">
+                ❌ Ошибка загрузки персонажей:
+                ${escapeHtml(error.message)}
+            </p>
+            `;
+    }
+}
+
+
+/* ============================================================
+   RENDER CHARACTERS
+============================================================ */
+
+function renderCharacters() {
+
+    const container =
+        document.getElementById(
+            "characters"
+        );
+
+
+    container.innerHTML = "";
+
+
+    if (!characters.length) {
+
+        container.innerHTML =
+            "<p>🎮 Персонажи не найдены</p>";
+
+        return;
+    }
+
+
+    characters.forEach(
+        character => {
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+
+            card.className =
+                "character";
+
+
+            card.addEventListener(
+                "click",
+                () => {
+
+                    showCharacter(
+                        character.id
+                    );
+
+                }
+            );
+
+
+            const image =
+                character.image ||
+                "";
+
+
+            const name =
+                character.name ||
+                "Неизвестный";
+
+
+            const game =
+                character.game ||
+                "Игра неизвестна";
+
+
+            card.innerHTML = `
+
+                <div class="character-image">
+
+                    ${
+                        image
+
+                        ?
+
+                        `
+                        <img
+                            src="${escapeHtml(image)}"
+                            alt="${escapeHtml(name)}"
+                            onerror="this.style.display='none'; this.parentElement.innerHTML='🎮';"
+                        >
+                        `
+
+                        :
+
+                        `
+                        🎮
+                        `
+                    }
+
+                </div>
+
+
+                <div class="character-name">
+
+                    ${escapeHtml(name)}
+
+                </div>
+
+
+                <div class="character-game">
+
+                    🎮 ${escapeHtml(game)}
+
+                </div>
+
+                <button
+                    class="open-character-button"
+                    type="button"
+                >
+                    📊 Открыть персонажа
+                </button>
+
+            `;
+
+            // Открытие карточки по клику.
+            // Останавливаем всплытие у кнопки, чтобы не было двойного вызова.
+            const openButton = card.querySelector(
+                ".open-character-button"
+            );
+
+            if (openButton) {
+                openButton.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    showCharacter(character.id);
+                });
+            }
+
+
+            container.appendChild(
+                card
+            );
+
+        }
+    );
+}
+
+
+/* ============================================================
+   SHOW CHARACTER
+============================================================ */
+
+function showCharacter(
+    characterId
+) {
+
+    const character =
+        characters.find(
+            item =>
+                item.id ===
+                characterId
+        );
+
+
+    if (!character) {
+
+        console.error(
+            "Персонаж не найден:",
+            characterId
+        );
+
+        return;
+    }
+
+
+    const modal =
+        document.getElementById(
+            "modal"
+        );
+
+
+    const modalContent =
+        document.getElementById(
+            "modalContent"
+        );
+
+
+    const characteristics =
+        character.characteristics ||
+        {};
+
+
+    let statsHtml = "";
+
+    if (Object.keys(characteristics).length === 0) {
+        statsHtml = `
+            <p style="color:#aaa;">
+                📊 Характеристики пока не указаны.
+            </p>
+        `;
+    }
+
+    Object.entries(
+        characteristics
+    ).forEach(
+        ([name, value]) => {
+
+            const number =
+                Math.max(
+                    0,
+                    Math.min(
+                        100,
+                        Number(value) || 0
+                    )
+                );
+
+
+            statsHtml += `
+
+                <div class="stat">
+
+                    <div class="stat-name">
+
+                        <span>
+                            ${escapeHtml(name)}
+                        </span>
+
+                        <strong>
+                            ${number}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="bar">
+
+                        <div
+                            class="bar-inner"
+                            style="width:${number}%"
+                        ></div>
+
+                    </div>
+
+                </div>
+
+            `;
+        }
+    );
+
+
+    modalContent.innerHTML = `
+
+        ${
+            character.image
+
+            ?
+
+            `
+            <img
+                src="${escapeHtml(character.image)}"
+                alt="${escapeHtml(character.name)}"
+            >
+            `
+
+            :
+
+            `
+            <div
+                style="
+                    font-size:120px;
+                    width:200px;
+                    text-align:center;
+                "
+            >
+                🎮
+            </div>
+            `
+        }
+
+
+        <div class="modal-info">
+
+            <h2>
+                ${escapeHtml(
+                    character.name ||
+                    "Неизвестный"
+                )}
+            </h2>
+
+
+            <div class="game">
+
+                🎮 ${escapeHtml(
+                    character.game ||
+                    "Неизвестная игра"
+                )}
+
+            </div>
+
+
+            <div class="role">
+
+                ⭐ Роль:
+                ${escapeHtml(
+                    character.role ||
+                    "Не указана"
+                )}
+
+            </div>
+
+
+            <p class="description">
+
+                ${escapeHtml(
+                    character.description ||
+                    "Описание отсутствует."
+                )}
+
+            </p>
+
+
+            <div class="stats">
+
+                <h3>
+                    📊 Характеристики
+                </h3>
+
+                ${statsHtml}
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    modal.classList.add(
+        "active"
+    );
+}
+
+
+/* ============================================================
+   CLOSE MODAL
+============================================================ */
+
+function closeModal() {
+
+    const modal =
+        document.getElementById(
+            "modal"
+        );
+
+
+    modal.classList.remove(
+        "active"
+    );
+}
+
+
+/* ============================================================
+   CLOSE MODAL BY BACKGROUND
+============================================================ */
+
+document
+    .getElementById("modal")
+    .addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target.id ===
+                "modal"
+            ) {
+
+                closeModal();
+
+            }
+
+        }
+    );
+
+
+/* ============================================================
+   ESC CLOSE MODAL
+============================================================ */
+
+document.addEventListener(
+    "keydown",
+    event => {
+
+        if (
+            event.key === "Escape"
+        ) {
+
+            closeModal();
+
+        }
+
+    }
+);
+
+
+/* ============================================================
+   ENTER SEARCH
+============================================================ */
+
+document
+    .getElementById(
+        "musicSearch"
+    )
+    .addEventListener(
+        "keydown",
+        event => {
+
+            if (
+                event.key ===
+                "Enter"
+            ) {
+
+                searchMusic();
+
+            }
+
+        }
+    );
+
+
+/* ============================================================
+   START
+============================================================ */
+
+loadCharacters();
+
+</script>
+
+</body>
+
+</html>
